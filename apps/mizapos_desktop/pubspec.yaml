@@ -1,10 +1,12 @@
-name: mizapos
+name: mizapos_desktop
 version: 1.0.36+37
+description: MizaPos — واجهة سطح المكتب (Windows).
 
-description: MizaPos — برنامج محاسبة.
+publish_to: none
 
 environment:
   sdk: ">=3.3.0 <4.0.0"
+
 dependencies:
   flutter:
     sdk: flutter
@@ -44,28 +46,16 @@ dev_dependencies:
   flutter_launcher_icons: ^0.14.3
 
 flutter_launcher_icons:
-  image_path: assets/branding/mizapos_app_icon.png
-  adaptive_icon_background: "#0B1628"
-  adaptive_icon_foreground: assets/branding/mizapos_app_icon.png
-  remove_alpha_ios: true
-  android: true
-  ios: true
-  web:
-    generate: true
+  image_path: ../../assets/branding/mizapos_app_icon.png
   windows:
-    generate: true
-  macos:
-    generate: true
-  linux:
     generate: true
 
 flutter:
   uses-material-design: true
   assets:
-    - assets/branding/mizapos_logo.png
-    - assets/branding/mizapos_logo_symbol.png
-    - assets/branding/mizapos_brand_mark_mp.png
-    - assets/branding/mizapos_app_icon.png
-    # خطوط PDF مضمّنة (بدون إنترنت) — Noto Sans Arabic، رخصة SIL OFL
-    - assets/fonts/NotoSansArabic-Regular.ttf
-    - assets/fonts/NotoSansArabic-Bold.ttf
+    - ../../assets/branding/mizapos_logo.png
+    - ../../assets/branding/mizapos_logo_symbol.png
+    - ../../assets/branding/mizapos_brand_mark_mp.png
+    - ../../assets/branding/mizapos_app_icon.png
+    - ../../assets/fonts/NotoSansArabic-Regular.ttf
+    - ../../assets/fonts/NotoSansArabic-Bold.ttf

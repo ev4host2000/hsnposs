@@ -1,0 +1,6 @@
+# روابط نظيفة لصفحات قانونية (تطابق روابط تطبيق الجوال)
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteRule ^terms-of-use/?$ terms-of-use.html [L,NC]
+  RewriteRule ^privacy-policy/?$ privacy-policy.html [L,NC]
+</IfModule>

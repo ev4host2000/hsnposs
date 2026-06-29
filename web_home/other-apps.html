@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#003366" />
+  <meta name="description" content="تطبيق مصاريف مجاني — تسجيل مصاريف يومية بسيط." />
+  <title>تطبيقات أخرى — MizaPos</title>
+  <link rel="icon" href="assets/branding/mizapos_app_icon.png" type="image/png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="sub-page">
+  <div class="bg-glow" aria-hidden="true"></div>
+  <header class="topbar" id="site-header" data-active="other-apps"></header>
+
+  <main class="sub-main">
+    <div class="wrap">
+      <p class="page-eyebrow">عائلة Miza</p>
+      <h1 class="page-title page-title--center">تطبيقات أخرى</h1>
+      <p class="page-lead page-lead--center">منتجات إضافية خفيفة لاحتياجات يومية</p>
+
+      <article class="other-app-feature other-app-feature--free">
+        <span class="badge-free badge-free--large">مجاني 100%</span>
+        <img
+          class="other-app-logo"
+          src="assets/branding/masareef_app_icon.png"
+          width="120"
+          height="120"
+          alt="تطبيق مصاريف"
+          loading="lazy"
+          decoding="async"
+        />
+        <div class="other-app-feature-body">
+          <p class="other-app-eyebrow">تطبيق أندرويد — بدون اشتراك</p>
+          <h2>تطبيق مصاريف</h2>
+          <p class="other-app-desc">
+            تطبيق <strong>مجاني بالكامل</strong> يساعدك على تسجيل المصاريف اليومية وتنظيمها بسهولة —
+            مثالي للمتابعة الشخصية أو المصروفات الصغيرة للمتجر. لا رسوم شهرية ولا تفعيل مطلوب.
+          </p>
+          <ul class="other-app-free-list">
+            <li>مجاني للتحميل والاستخدام</li>
+            <li>واجهة بسيطة وسريعة</li>
+            <li>منفصل عن اشتراك MizaPos</li>
+          </ul>
+          <a class="btn btn-android btn-lg" href="#" data-download-masareef>
+            <svg class="btn-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 4l-2 3h16l-2-3H6zm-1 5v9h14V9H5zm2 11a2 2 0 100 4 2 2 0 000-4zm10 0a2 2 0 100 4 2 2 0 000-4z"/></svg>
+            تحميل مجاني (APK)
+          </a>
+          <p class="dl-hint">masareef-app.apk — مجاناً</p>
+        </div>
+      </article>
+
+      <p class="other-apps-note">
+        <a href="index.html">العودة إلى MizaPos</a> ·
+        <a href="contact.html">اقترح تطبيقاً جديداً</a>
+      </p>
+    </div>
+  </main>
+
+  <footer class="footer">
+    <div class="wrap footer-inner">
+      <img src="assets/branding/mizapos_logo.png" width="100" height="100" alt="MizaPos" class="footer-logo" loading="lazy" />
+      <p>© <span id="y"></span> <strong>MizaPos</strong></p>
+      <p class="footer-legal">
+        <a href="index.html">الرئيسية</a>
+        <span aria-hidden="true"> · </span>
+        <a href="contact.html">اتصل بنا</a>
+      </p>
+    </div>
+  </footer>
+
+  <script>document.getElementById("y").textContent = new Date().getFullYear();</script>
+  <script src="site-config.js" defer></script>
+  <script src="site-shell.js" defer></script>
+</body>
+</html>

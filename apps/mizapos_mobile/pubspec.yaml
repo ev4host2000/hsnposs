@@ -1,17 +1,18 @@
-name: mizapos
+name: mizapos_mobile
 version: 1.0.36+37
+description: MizaPos — واجهة الجوال (Android).
 
-description: MizaPos — برنامج محاسبة.
+publish_to: none
 
 environment:
   sdk: ">=3.3.0 <4.0.0"
+
 dependencies:
   flutter:
     sdk: flutter
   flutter_localizations:
     sdk: flutter
   sqflite: ^2.0.0
-  sqflite_common_ffi: ^2.3.4+4
   get: ^4.0.0
   path: ^1.9.0
   path_provider: ^2.1.5
@@ -28,14 +29,11 @@ dependencies:
   mailer: ^7.1.0
   http: ^1.3.0
   flutter_local_notifications: ^21.0.0
-  window_manager: ^0.5.1
   shared_preferences: ^2.5.5
   pub_semver: ^2.2.0
-  desktop_multi_window: ^0.3.0
   mobile_scanner: ^7.2.0
   open_file: ^3.5.11
   image: ^4.3.0
-  win32: ^6.1.0
 
 dev_dependencies:
   flutter_test:
@@ -44,28 +42,15 @@ dev_dependencies:
   flutter_launcher_icons: ^0.14.3
 
 flutter_launcher_icons:
-  image_path: assets/branding/mizapos_app_icon.png
+  image_path: ../../assets/branding/mizapos_logo_symbol_clean.png
   adaptive_icon_background: "#0B1628"
-  adaptive_icon_foreground: assets/branding/mizapos_app_icon.png
-  remove_alpha_ios: true
+  adaptive_icon_foreground: ../../assets/branding/mizapos_logo_symbol_clean.png
   android: true
-  ios: true
-  web:
-    generate: true
-  windows:
-    generate: true
-  macos:
-    generate: true
-  linux:
-    generate: true
 
 flutter:
   uses-material-design: true
   assets:
-    - assets/branding/mizapos_logo.png
-    - assets/branding/mizapos_logo_symbol.png
-    - assets/branding/mizapos_brand_mark_mp.png
-    - assets/branding/mizapos_app_icon.png
-    # خطوط PDF مضمّنة (بدون إنترنت) — Noto Sans Arabic، رخصة SIL OFL
+    - ../../assets/branding/mizapos_logo.png
+    - ../../assets/branding/mizapos_logo_symbol_clean.png
     - assets/fonts/NotoSansArabic-Regular.ttf
     - assets/fonts/NotoSansArabic-Bold.ttf
