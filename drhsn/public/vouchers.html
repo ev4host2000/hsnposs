@@ -1,0 +1,2921 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="activation-api-base" content="__ACTIVATION_BASE__" />
+  <meta name="activation-asset-ver" content="__ACTIVATION_ASSET_VER__" />
+  <link rel="canonical" href="https://mizapos.com/drhsn/public/vouchers.html" />
+  <title>MizaPos — إدارة قسائم الاشتراك</title>
+  <link rel="icon" href="assets/branding/mizapos_app_icon.png" type="image/png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" />
+  <style>
+    :root {
+      --brand-1: #6366f1;
+      --brand-2: #8b5cf6;
+      --brand-3: #ec4899;
+      --bg: #f4f5fb;
+      --surface: #ffffff;
+      --border: #e6e8f0;
+      --text: #0f172a;
+      --muted: #64748b;
+      --ok: #10b981;
+      --warn: #f59e0b;
+      --danger: #ef4444;
+      --info: #3b82f6;
+      --shadow-sm: 0 2px 8px rgba(15, 23, 42, 0.06);
+      --shadow-md: 0 8px 30px rgba(15, 23, 42, 0.08);
+      --shadow-lg: 0 20px 50px rgba(15, 23, 42, 0.12);
+      --radius-sm: 8px;
+      --radius-md: 12px;
+      --radius-lg: 18px;
+      --radius-xl: 24px;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; height: 100%; }
+    body {
+      font-family: 'Cairo', 'Segoe UI', Tahoma, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      font-size: 14px;
+      line-height: 1.55;
+    }
+    .mono { font-family: 'JetBrains Mono', Consolas, monospace; letter-spacing: 0.6px; }
+
+    /* === Top hero bar === */
+    .topbar {
+      background: linear-gradient(135deg, var(--brand-1) 0%, var(--brand-2) 50%, var(--brand-3) 100%);
+      color: #fff;
+      padding: 22px 28px 18px;
+      box-shadow: var(--shadow-md);
+      position: relative;
+      overflow: hidden;
+    }
+    .topbar::before {
+      content: "";
+      position: absolute;
+      inset: -40%;
+      background:
+        radial-gradient(circle at 18% 12%, rgba(255, 255, 255, 0.18), transparent 28%),
+        radial-gradient(circle at 82% 75%, rgba(255, 255, 255, 0.12), transparent 30%);
+      pointer-events: none;
+    }
+    .topbar-inner {
+      max-width: 1280px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      position: relative;
+      flex-wrap: wrap;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .brand-mark {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.15);
+      backdrop-filter: blur(8px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+    .brand-mark img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+      background: transparent;
+    }
+    .topbar .brand-mark {
+      width: 44px;
+      height: 44px;
+      max-width: 44px;
+      max-height: 44px;
+    }
+    .brand-title {
+      font-size: 18px;
+      font-weight: 800;
+      letter-spacing: 0.2px;
+    }
+    .brand-sub {
+      font-size: 12px;
+      opacity: 0.85;
+      font-weight: 500;
+    }
+    .topbar-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .top-link {
+      color: #fff;
+      text-decoration: none;
+      padding: 8px 14px;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.12);
+      font-weight: 600;
+      font-size: 13px;
+      transition: background 0.2s, transform 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .top-link:hover { background: rgba(255, 255, 255, 0.22); transform: translateY(-1px); }
+    .top-logout {
+      background: rgba(255, 255, 255, 0.2);
+      border: none;
+      color: #fff;
+      cursor: pointer;
+      font: inherit;
+      font-weight: 700;
+      padding: 8px 14px;
+      border-radius: 10px;
+    }
+    .top-logout:hover { background: rgba(0, 0, 0, 0.18); }
+
+    /* === Layout === */
+    .container {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 24px 22px 56px;
+    }
+    .grid-2 {
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+      gap: 18px;
+    }
+    @media (max-width: 980px) {
+      .grid-2 { grid-template-columns: 1fr; }
+    }
+
+    /* === Cards === */
+    .card {
+      background: var(--surface);
+      border-radius: var(--radius-lg);
+      padding: 22px;
+      box-shadow: var(--shadow-sm);
+      border: 1px solid var(--border);
+    }
+    .card-title {
+      margin: 0 0 6px;
+      font-size: 16px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .card-title .ic {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      background: rgba(99, 102, 241, 0.12);
+      color: var(--brand-1);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+    }
+    .card-sub {
+      color: var(--muted);
+      font-size: 12.5px;
+      margin: 0 0 14px;
+    }
+
+    /* === Stats === */
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+    @media (max-width: 720px) { .stats { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 640px) {
+      .topbar { padding: 16px 14px 14px; }
+      .topbar-inner { justify-content: center; text-align: center; }
+      .topbar-actions { width: 100%; justify-content: center; flex-wrap: wrap; }
+      .container { padding: 14px 10px 40px; }
+      .card { padding: 16px; border-radius: var(--radius-md); }
+      .app-nav {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        padding: 6px;
+        gap: 6px;
+      }
+      .app-nav-btn:last-child { grid-column: 1 / -1; }
+      .app-nav-btn { flex: 1 1 auto; font-size: 13px; padding: 11px 10px; }
+      .data { min-width: 0; }
+      .data th, .data td { padding: 10px 8px; font-size: 12.5px; }
+      .reg-table .col-actions { position: sticky; inset-inline-start: 0; background: var(--surface); z-index: 1; }
+      .table-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+      }
+      .table-toolbar .input,
+      .table-toolbar .select,
+      .table-toolbar .btn { max-width: none !important; width: 100%; }
+      .table-toolbar .grow { display: none; }
+      .modal-back.open { padding: 8px; align-items: flex-start; }
+      .modal {
+        width: 100%;
+        max-width: none;
+        margin: 0;
+        max-height: calc(100dvh - 16px);
+        overflow: auto;
+        border-radius: var(--radius-md);
+      }
+      .modal .grid-2 { grid-template-columns: 1fr; }
+      .modal-head h2 { font-size: 15px; line-height: 1.4; }
+      .row { flex-wrap: wrap; }
+    }
+    .typed-limit-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    @media (max-width: 520px) {
+      .typed-limit-grid { grid-template-columns: 1fr; }
+    }
+    .device-limit-panel {
+      border: 1px dashed var(--border);
+      border-radius: var(--radius-md);
+      padding: 12px;
+      background: #f8fafc;
+      margin-top: 10px;
+    }
+    .device-limit-panel.hidden { display: none !important; }
+    .platform-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 800;
+      background: #eef2ff;
+      color: #4338ca;
+    }
+    .platform-pill.android { background: #ecfdf5; color: #047857; }
+    .stat {
+      background: var(--surface);
+      border-radius: var(--radius-md);
+      padding: 16px 18px;
+      box-shadow: var(--shadow-sm);
+      border: 1px solid var(--border);
+      position: relative;
+      overflow: hidden;
+    }
+    .stat::after {
+      content: "";
+      position: absolute;
+      inset: auto -10px -10px auto;
+      width: 60px;
+      height: 60px;
+      border-radius: 999px;
+      background: var(--stat-color, var(--brand-1));
+      opacity: 0.1;
+    }
+    .stat-label { color: var(--muted); font-size: 12px; font-weight: 600; margin-bottom: 6px; }
+    .stat-value { font-size: 28px; font-weight: 900; line-height: 1.1; color: var(--stat-color, var(--brand-1)); }
+    .stat--total { --stat-color: var(--brand-1); }
+    .stat--unused { --stat-color: var(--warn); }
+    .stat--redeemed { --stat-color: var(--ok); }
+    .stat--revoked { --stat-color: var(--danger); }
+
+    /* === Inputs & buttons === */
+    .field { margin-bottom: 12px; }
+    .label {
+      display: block;
+      font-size: 12.5px;
+      font-weight: 700;
+      color: #334155;
+      margin-bottom: 6px;
+    }
+    .input, .select, .textarea {
+      width: 100%;
+      padding: 11px 14px;
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      font: inherit;
+      font-size: 14px;
+      background: #fff;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      color: var(--text);
+    }
+    .input:focus, .select:focus, .textarea:focus {
+      outline: none;
+      border-color: var(--brand-1);
+      box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.12);
+    }
+    .input.mono, .textarea.mono { font-family: 'JetBrains Mono', Consolas, monospace; letter-spacing: 1px; }
+    .textarea { resize: vertical; min-height: 90px; }
+    .hint { color: var(--muted); font-size: 12px; margin: 6px 2px 0; }
+
+    .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .row > * { min-width: 0; }
+    .row.between { justify-content: space-between; }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 10px 18px;
+      border-radius: 10px;
+      font: inherit;
+      font-weight: 700;
+      font-size: 13.5px;
+      cursor: pointer;
+      border: 1.5px solid var(--border);
+      background: #fff;
+      color: var(--text);
+      transition: all 0.2s;
+      text-decoration: none;
+    }
+    .btn:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: var(--shadow-sm);
+    }
+    .btn:disabled { opacity: 0.55; cursor: not-allowed; }
+    .btn-block { width: 100%; }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--brand-1), var(--brand-2));
+      color: #fff;
+      border-color: transparent;
+      box-shadow: 0 4px 14px rgba(99, 102, 241, 0.3);
+    }
+    .btn-primary:hover:not(:disabled) {
+      box-shadow: 0 6px 18px rgba(99, 102, 241, 0.4);
+    }
+    .btn-danger {
+      background: linear-gradient(135deg, #f43f5e, #ef4444);
+      color: #fff;
+      border-color: transparent;
+    }
+    .btn-success {
+      background: linear-gradient(135deg, #22c55e, #16a34a);
+      color: #fff;
+      border-color: transparent;
+      box-shadow: 0 4px 14px rgba(34, 197, 94, 0.28);
+    }
+    .btn-success:hover:not(:disabled) {
+      box-shadow: 0 6px 18px rgba(34, 197, 94, 0.38);
+    }
+    .btn-ghost { background: transparent; }
+    .btn-sm { padding: 6px 12px; font-size: 12.5px; border-radius: 8px; }
+
+    /* === Pills === */
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 11.5px;
+      font-weight: 800;
+      letter-spacing: 0.3px;
+    }
+    .pill::before {
+      content: "●";
+      font-size: 8px;
+    }
+    .pill--ok { background: rgba(16, 185, 129, 0.12); color: var(--ok); }
+    .pill--warn { background: rgba(245, 158, 11, 0.14); color: var(--warn); }
+    .pill--danger { background: rgba(239, 68, 68, 0.14); color: var(--danger); }
+    .pill--info { background: rgba(59, 130, 246, 0.14); color: var(--info); }
+
+    /* === Toast === */
+    .toast-wrap {
+      position: fixed;
+      top: 22px;
+      left: 22px;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      pointer-events: none;
+    }
+    .toast {
+      pointer-events: auto;
+      background: #fff;
+      border-radius: 12px;
+      padding: 12px 16px;
+      box-shadow: var(--shadow-lg);
+      border-right: 4px solid var(--brand-1);
+      min-width: 260px;
+      max-width: 380px;
+      font-size: 13.5px;
+      font-weight: 600;
+      animation: toast-in 0.3s ease-out;
+    }
+    .toast--ok { border-right-color: var(--ok); }
+    .toast--err { border-right-color: var(--danger); }
+    .toast--warn { border-right-color: var(--warn); }
+    @keyframes toast-in {
+      from { opacity: 0; transform: translateY(-8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* === Table === */
+    .table-wrap {
+      background: var(--surface);
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow-sm);
+      overflow: hidden;
+    }
+    .table-toolbar {
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+      background: #fafbff;
+    }
+    .table-toolbar .grow { flex: 1 1 200px; }
+    table.data {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      font-size: 13.5px;
+    }
+    table.data thead th {
+      text-align: right;
+      padding: 12px 14px;
+      font-weight: 800;
+      font-size: 12.5px;
+      color: #475569;
+      background: #fafbff;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+    }
+    table.data tbody td {
+      padding: 12px 14px;
+      border-bottom: 1px solid #f1f4fb;
+      vertical-align: middle;
+    }
+    table.data tbody tr:hover { background: #fafbff; }
+    table.data tbody tr:last-child td { border-bottom: none; }
+    .empty-row {
+      text-align: center;
+      padding: 32px !important;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    /* === Modal === */
+    .modal-back {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.55);
+      backdrop-filter: blur(4px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 20px;
+    }
+    .modal-back.open { display: flex; }
+    .modal {
+      background: #fff;
+      border-radius: var(--radius-xl);
+      box-shadow: var(--shadow-lg);
+      max-width: 760px;
+      width: 100%;
+      max-height: 88vh;
+      overflow: auto;
+      padding: 24px;
+      animation: modal-in 0.25s ease-out;
+    }
+    @keyframes modal-in {
+      from { opacity: 0; transform: scale(0.96) translateY(8px); }
+      to { opacity: 1; transform: scale(1) translateY(0); }
+    }
+    .modal-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+    .modal-head h2 { margin: 0; font-size: 18px; font-weight: 900; }
+    .icon-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 999px;
+      border: none;
+      background: #f1f5f9;
+      cursor: pointer;
+      font-size: 16px;
+      color: var(--muted);
+    }
+    .icon-btn:hover { background: #e2e8f0; color: var(--text); }
+
+    /* === Login screen full-page === */
+    .login-page {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background:
+        radial-gradient(circle at 10% 20%, rgba(139, 92, 246, 0.18), transparent 40%),
+        radial-gradient(circle at 90% 80%, rgba(236, 72, 153, 0.18), transparent 40%),
+        var(--bg);
+    }
+    .login-card {
+      background: var(--surface);
+      border-radius: var(--radius-xl);
+      box-shadow: var(--shadow-lg);
+      max-width: 420px;
+      width: 100%;
+      padding: 32px 28px 28px;
+      border: 1px solid var(--border);
+    }
+    .login-card .brand-mark {
+      width: 120px;
+      height: 120px;
+      max-width: 120px;
+      max-height: 120px;
+      border-radius: 18px;
+      background: transparent;
+      box-shadow: none;
+      margin: 0 auto 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    .login-card .brand-mark img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+    }
+    .login-card h1 {
+      font-size: 20px;
+      margin: 0 0 4px;
+      text-align: center;
+      font-weight: 900;
+    }
+    .login-card .sub {
+      text-align: center;
+      color: var(--muted);
+      font-size: 13px;
+      margin-bottom: 22px;
+    }
+
+    /* === Code box (batch output) === */
+    .code-list {
+      background: linear-gradient(180deg, #1e293b, #0f172a);
+      color: #f1f5f9;
+      padding: 14px 16px;
+      border-radius: 12px;
+      max-height: 240px;
+      overflow: auto;
+      font-family: 'JetBrains Mono', Consolas, monospace;
+      font-size: 13.5px;
+      letter-spacing: 1.2px;
+      white-space: pre;
+      line-height: 1.7;
+    }
+    .code-list .copy-btn { color: #a5b4fc; cursor: pointer; }
+
+    /* === Country flag UI === */
+    /* بطاقة دولة بارزة داخل نافذة التفاصيل (يأخذ خلفية لطيفة وحدوداً) */
+    .country-banner {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 12px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border);
+      background: linear-gradient(135deg, #eef2ff 0%, #ffffff 60%);
+      box-shadow: var(--shadow-sm);
+      margin: 4px 0 12px;
+      min-height: 56px;
+    }
+    .country-banner .flag-img {
+      width: 56px;
+      height: 40px;
+      border-radius: 6px;
+      object-fit: cover;
+      box-shadow: 0 4px 14px rgba(15, 23, 42, 0.12);
+      flex-shrink: 0;
+      background: #f1f5f9;
+    }
+    .country-banner .ct-meta { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .country-banner .ct-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--muted);
+      letter-spacing: 0.4px;
+    }
+    .country-banner .ct-name {
+      font-size: 15px;
+      font-weight: 900;
+      color: var(--text);
+      line-height: 1.15;
+    }
+    .country-banner .ct-dial {
+      font-family: 'JetBrains Mono', Consolas, monospace;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--brand-1);
+      direction: ltr;
+      unicode-bidi: plaintext;
+    }
+    .country-banner.empty {
+      background: #f8fafc;
+      color: var(--muted);
+    }
+    .country-banner.empty .flag-img {
+      background: #e2e8f0;
+    }
+
+    /* رمز علم صغير داخل بطاقة التفاصيل (في صفّ الدولة) */
+    .flag-inline {
+      width: 22px;
+      height: 16px;
+      border-radius: 3px;
+      object-fit: cover;
+      vertical-align: -3px;
+      margin-inline-end: 6px;
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.18);
+    }
+
+    /* علم مصغّر في صفوف القائمة بجانب بريد المشترك */
+    .flag-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      max-width: 100%;
+    }
+    .flag-chip > .flag-mini {
+      width: 18px;
+      height: 13px;
+      border-radius: 2px;
+      object-fit: cover;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.2);
+      flex-shrink: 0;
+    }
+    .flag-chip > .flag-text {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* === Utilities === */
+    .hidden { display: none !important; }
+    .ml-auto { margin-inline-start: auto; }
+    .sep { height: 1px; background: var(--border); margin: 14px 0; }
+    .text-muted { color: var(--muted); }
+    .text-mono { font-family: 'JetBrains Mono', Consolas, monospace; }
+    .num-input { max-width: 100px; }
+    .info-line {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 6px 0;
+      border-bottom: 1px dashed #e2e8f0;
+      font-size: 13px;
+    }
+    .info-line:last-child { border-bottom: none; }
+    .info-line .k { color: var(--muted); font-weight: 600; }
+    .info-line .v { font-weight: 700; }
+
+    /* === App navigation tabs === */
+    .app-nav {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 18px;
+      padding: 6px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-sm);
+    }
+    .app-nav-btn {
+      flex: 1 1 140px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 12px 16px;
+      border: 1.5px solid transparent;
+      border-radius: var(--radius-md);
+      background: transparent;
+      color: var(--muted);
+      font: inherit;
+      font-weight: 800;
+      font-size: 13.5px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .app-nav-btn:hover {
+      background: #f8fafc;
+      color: var(--text);
+    }
+    .app-nav-btn.active {
+      background: linear-gradient(135deg, rgba(99, 102, 241, 0.12), rgba(139, 92, 246, 0.1));
+      border-color: rgba(99, 102, 241, 0.35);
+      color: var(--brand-1);
+      box-shadow: var(--shadow-sm);
+    }
+    .app-panel.hidden { display: none !important; }
+    .panel-head {
+      margin: 0 0 14px;
+    }
+    .panel-head h2 {
+      margin: 0 0 4px;
+      font-size: 18px;
+      font-weight: 900;
+    }
+    .panel-head p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .cloud-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 800;
+      background: #e0f2fe;
+      color: #0369a1;
+    }
+    .cloud-badge.off { background: #f1f5f9; color: #94a3b8; }
+    .section-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-sm);
+      overflow: hidden;
+    }
+  </style>
+</head>
+<body>
+  <div class="toast-wrap" id="toasts"></div>
+
+  <!-- Login -->
+  <div id="loginScreen" class="login-page">
+    <form id="loginForm" class="login-card" autocomplete="on">
+      <div class="brand-mark">
+        <img src="assets/branding/mizapos_logo.png" width="120" height="120" alt="MizaPos" />
+      </div>
+      <h1>إدارة قسائم الاشتراك</h1>
+      <p class="sub">سجّل دخولك بحساب المسؤول لإدارة القسائم.</p>
+      <div class="field">
+        <label class="label" for="admEmail">البريد (اختياري إن كان النظام قديماً بكلمة سر فقط من ملف الإعداد)</label>
+        <input id="admEmail" class="input" type="email" autocomplete="username" placeholder="admin@email.com" />
+      </div>
+      <div class="field">
+        <label class="label" for="admPass">كلمة المرور</label>
+        <input id="admPass" class="input" type="password" autocomplete="current-password" placeholder="••••••••" required />
+      </div>
+      <button id="btnLogin" type="submit" class="btn btn-primary btn-block">دخول</button>
+      <div style="display:flex;justify-content:flex-end;align-items:center;margin-top:14px;font-size:12.5px">
+        <button type="button" id="btnDiag" class="btn btn-sm btn-ghost" style="font-size:12px">تشخيص الاتصال</button>
+      </div>
+      <pre id="diagBox" class="hidden" style="margin-top:12px;background:#0f172a;color:#e2e8f0;padding:12px;border-radius:10px;font-family:'JetBrains Mono',Consolas,monospace;font-size:11.5px;line-height:1.55;max-height:240px;overflow:auto;white-space:pre-wrap;direction:ltr;text-align:left"></pre>
+    </form>
+  </div>
+
+  <!-- App -->
+  <div id="appScreen" class="hidden">
+    <header class="topbar">
+      <div class="topbar-inner">
+        <div class="brand">
+          <div class="brand-mark">
+            <img src="assets/branding/mizapos_app_icon.png" width="44" height="44" alt="MizaPos" />
+          </div>
+          <div>
+            <div class="brand-title">إدارة قسائم الاشتراك</div>
+            <div class="brand-sub">MizaPos — منظومة Miza-XXXX-XXXX-XXXX</div>
+          </div>
+        </div>
+        <div class="topbar-actions">
+          <span class="top-link" id="adminEmailBadge" style="background:rgba(255,255,255,0.18)">—</span>
+          <button class="top-logout" id="btnLogout">خروج</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="container">
+      <nav class="app-nav" aria-label="أقسام الإدارة">
+        <button type="button" class="app-nav-btn active" data-panel="generate" id="navGenerate">✚ توليد القسائم</button>
+        <button type="button" class="app-nav-btn" data-panel="list" id="navList">📑 قائمة القسائم</button>
+        <button type="button" class="app-nav-btn" data-panel="registered" id="navRegistered">👥 المسجّلون <span id="regCountBadge" class="pill pill--info" style="padding:2px 8px;font-size:11px">—</span></button>
+      </nav>
+
+      <!-- Panel: Generate -->
+      <div id="panel-generate" class="app-panel">
+      <div class="grid-2" style="margin-bottom:0">
+        <section class="card">
+          <h2 class="card-title"><span class="ic">✚</span>توليد دفعة قسائم جديدة</h2>
+          <p class="card-sub">حدّد عدد القسائم وعدد الأجهزة (حاسوب + أندرويد). الاشتراك السنوي <strong>70$</strong> يشمل نسختي الحاسوب والجوال لنفس الحساب.</p>
+          <form id="genForm">
+            <div class="row" style="margin-bottom:12px">
+              <div class="field" style="flex:1 1 130px;margin-bottom:0">
+                <label class="label" for="genCount">عدد القسائم</label>
+                <input id="genCount" class="input" type="number" min="1" max="500" value="1" required />
+              </div>
+              <div class="field" style="flex:1 1 130px;margin-bottom:0">
+                <label class="label" for="genMax">أجهزة/قسيمة (إجمالي)</label>
+                <input id="genMax" class="input" type="number" min="1" max="99" value="1" required />
+              </div>
+            </div>
+            <label class="label" style="display:flex;align-items:center;gap:8px;margin-bottom:8px;cursor:pointer">
+              <input id="genUseTyped" type="checkbox" />
+              <span>تحديد حسب نوع الجهاز (حاسوب + أندرويد)</span>
+            </label>
+            <div id="genTypedPanel" class="device-limit-panel hidden">
+              <div class="typed-limit-grid">
+                <div class="field" style="margin-bottom:0">
+                  <label class="label" for="genMaxDesktop">💻 حاسوب</label>
+                  <input id="genMaxDesktop" class="input" type="number" min="0" max="50" value="1" />
+                </div>
+                <div class="field" style="margin-bottom:0">
+                  <label class="label" for="genMaxAndroid">📱 أندرويد</label>
+                  <input id="genMaxAndroid" class="input" type="number" min="0" max="50" value="1" />
+                </div>
+              </div>
+              <p class="hint" style="margin:8px 0 0">مثال: 1 حاسوب + 1 أندرويد = قسيمتان فقط. بعد تفعيل الحاسوب يبقى تفعيل الأندرويد فقط.</p>
+            </div>
+            <div class="field">
+              <label class="label" for="genNote">ملاحظة (السعر، اسم العميل، …)</label>
+              <input id="genNote" class="input" type="text" placeholder="مثال: 200﷼ — أحمد المحاسب" />
+            </div>
+            <label class="label hidden" style="display:flex;align-items:center;gap:8px;margin:12px 0 8px;cursor:pointer">
+              <input id="genIncludeDistCloud" type="checkbox" disabled />
+              <span>☁️ إرفاق سحابة الموزّعين ($50/سنة)</span>
+            </label>
+            <div id="genDistCloudPanel" class="device-limit-panel hidden">
+              <div class="row" style="margin-bottom:0">
+                <div class="field" style="flex:1 1 130px;margin-bottom:0">
+                  <label class="label" for="genDistCloudDays">مدة السحابة (أيام)</label>
+                  <input id="genDistCloudDays" class="input" type="number" min="1" max="3660" value="365" />
+                </div>
+                <div class="field" style="flex:1 1 130px;margin-bottom:0">
+                  <label class="label" for="genDistSeats">مقاعد موزّعين (فارغ = بلا حد)</label>
+                  <input id="genDistSeats" class="input" type="number" min="0" max="9999" placeholder="—" />
+                </div>
+              </div>
+            </div>
+            <button class="btn btn-primary btn-block" id="btnGenerate" type="submit">توليد القسائم</button>
+          </form>
+        </section>
+
+        <!-- Last batch -->
+        <section class="card">
+          <h2 class="card-title"><span class="ic">📋</span>آخر دفعة مُولَّدة</h2>
+          <div id="batchEmpty" class="card-sub">لم تُولَّد دفعة بعد في هذه الجلسة.</div>
+          <div id="batchOut" class="hidden">
+            <div class="info-line"><span class="k">رقم الدفعة</span><span class="v mono" id="batchId">—</span></div>
+            <div class="info-line"><span class="k">عدد الأكواد</span><span class="v" id="batchCount">0</span></div>
+            <div class="info-line"><span class="k">أجهزة/قسيمة</span><span class="v" id="batchMax">—</span></div>
+            <div class="info-line hidden" id="batchDistCloudLine"><span class="k">سحابة موزّعين</span><span class="v" id="batchDistCloud">—</span></div>
+            <div class="sep"></div>
+            <div class="code-list" id="batchCodes"></div>
+            <div class="row" style="margin-top:12px">
+              <button class="btn btn-sm" id="btnCopy">📋 نسخ الكل</button>
+              <button class="btn btn-sm" id="btnCsv">⬇ تنزيل CSV</button>
+              <button class="btn btn-sm" id="btnPrint">🖨 طباعة</button>
+            </div>
+          </div>
+        </section>
+      </div>
+      </div><!-- /panel-generate -->
+
+      <!-- Panel: List -->
+      <div id="panel-list" class="app-panel hidden">
+      <div class="stats">
+        <div class="stat stat--total">
+          <div class="stat-label">إجمالي القسائم</div>
+          <div class="stat-value" id="statTotal">0</div>
+        </div>
+        <div class="stat stat--unused">
+          <div class="stat-label">غير مستخدمة</div>
+          <div class="stat-value" id="statUnused">0</div>
+        </div>
+        <div class="stat stat--redeemed">
+          <div class="stat-label">مُستخدمة</div>
+          <div class="stat-value" id="statRedeemed">0</div>
+        </div>
+        <div class="stat stat--revoked">
+          <div class="stat-label">ملغاة</div>
+          <div class="stat-value" id="statRevoked">0</div>
+        </div>
+      </div>
+
+      <!-- List -->
+      <section class="section-card table-wrap">
+        <div class="table-toolbar">
+          <h2 class="card-title" style="margin:0"><span class="ic">📑</span>قائمة القسائم</h2>
+          <div class="grow"></div>
+          <input id="filterSearch" class="input" type="text" placeholder="🔍 بحث (كود / ملاحظة / بريد)" style="max-width:280px" />
+          <select id="filterStatus" class="select" style="max-width:150px">
+            <option value="">كل الحالات</option>
+            <option value="unused">غير مستخدمة</option>
+            <option value="redeemed">مُستخدمة</option>
+            <option value="revoked">ملغاة</option>
+          </select>
+          <select id="pageSize" class="select" style="max-width:130px" title="عدد القسائم لكل صفحة">
+            <option value="25">25 / صفحة</option>
+            <option value="50" selected>50 / صفحة</option>
+            <option value="100">100 / صفحة</option>
+            <option value="200">200 / صفحة</option>
+          </select>
+          <button class="btn" id="btnReload">🔄 تحديث</button>
+          <button class="btn" id="btnExportAll">⬇ تصدير CSV</button>
+        </div>
+        <div style="overflow:auto">
+          <table class="data">
+            <thead>
+              <tr>
+                <th>الكود</th>
+                <th>الحالة</th>
+                <th>الأجهزة</th>
+                <th>المشترك</th>
+                <th>الملاحظة</th>
+                <th>تاريخ التوليد</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="vouchersTbody">
+              <tr><td colspan="7" class="empty-row">— حمّل القائمة لعرض القسائم —</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <!-- Pager -->
+        <div id="pager" class="table-toolbar" style="border-top:1px solid var(--border);border-bottom:none;background:#fafbff">
+          <div id="pagerInfo" class="text-muted" style="font-size:12.5px;font-weight:700">—</div>
+          <div class="grow"></div>
+          <button class="btn btn-sm" id="btnFirst" title="الأولى">«</button>
+          <button class="btn btn-sm" id="btnPrev" title="السابقة">‹</button>
+          <span id="pagerPage" class="pill pill--info" style="padding:4px 10px">1</span>
+          <button class="btn btn-sm" id="btnNext" title="التالية">›</button>
+          <button class="btn btn-sm" id="btnLast" title="الأخيرة">»</button>
+        </div>
+      </section>
+      </div><!-- /panel-list -->
+
+      <!-- Panel: Registered users -->
+      <div id="panel-registered" class="app-panel hidden">
+        <div class="panel-head">
+          <h2>المسجّلون — من أنشأوا حساباً</h2>
+          <p>قائمة مستقلة عن قسائم الاشتراك؛ تعرض طلبات إنشاء الحساب. الاشتراك السنوي 70$ يشمل حاسوب + أندرويد — يمكن تجديده أو تمديده أو إيقافه من «تعديل».</p>
+        </div>
+        <section class="section-card table-wrap reg-table">
+          <div class="table-toolbar">
+            <input id="regFilterSearch" class="input grow" type="text" placeholder="🔍 بحث (اسم / بريد / هاتف / مؤسسة)" />
+            <select id="regFilterStatus" class="select" style="max-width:160px">
+              <option value="all">كل الحالات</option>
+              <option value="approved">حساب مُعتمد</option>
+              <option value="pending">قيد الانتظار</option>
+              <option value="rejected">مرفوض</option>
+            </select>
+            <select id="regPageSize" class="select" style="max-width:130px">
+              <option value="25">25 / صفحة</option>
+              <option value="50" selected>50 / صفحة</option>
+              <option value="100">100 / صفحة</option>
+              <option value="200">200 / صفحة</option>
+            </select>
+            <button class="btn btn-sm" id="btnRegReload">🔄 تحديث</button>
+            <button class="btn btn-sm" id="btnRegExport" title="تصدير كل المسجّلين المطابقين للبحث والفلتر">⬇ تصدير CSV</button>
+          </div>
+          <div style="overflow:auto">
+            <table class="data">
+              <thead>
+                <tr>
+                  <th>الاسم</th>
+                  <th>البريد</th>
+                  <th>البريد مُؤكَّد</th>
+                  <th>الدولة</th>
+                  <th>القسيمة</th>
+                  <th class="col-actions"></th>
+                </tr>
+              </thead>
+              <tbody id="regTbody">
+                <tr><td colspan="6" class="empty-row">— انتقل لهذا القسم لتحميل القائمة —</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="table-toolbar" style="border-top:1px solid var(--border);border-bottom:none;background:#fafbff">
+            <div id="regPagerInfo" class="text-muted" style="font-size:12.5px;font-weight:700">—</div>
+            <div class="grow"></div>
+            <button class="btn btn-sm" id="btnRegFirst" title="الأولى">«</button>
+            <button class="btn btn-sm" id="btnRegPrev" title="السابقة">‹</button>
+            <span id="regPagerPage" class="pill pill--info" style="padding:4px 10px">1</span>
+            <button class="btn btn-sm" id="btnRegNext" title="التالية">›</button>
+            <button class="btn btn-sm" id="btnRegLast" title="الأخيرة">»</button>
+          </div>
+        </section>
+      </div><!-- /panel-registered -->
+    </main>
+  </div>
+
+  <!-- Modal: edit registered user -->
+  <div class="modal-back" id="regEditModalBack">
+    <div class="modal" style="max-width:760px">
+      <div class="modal-head">
+        <h2>تعديل مسجّل</h2>
+        <button class="icon-btn" id="regEditClose">✕</button>
+      </div>
+      <div class="info-line"><span class="k">الاسم</span><span id="regEditName" class="v">—</span></div>
+      <div class="info-line"><span class="k">البريد الحالي</span><span id="regEditEmailDisplay" class="v">—</span></div>
+      <div class="info-line"><span class="k">البريد مُؤكَّد</span><span id="regEditEmailVerified" class="v">—</span></div>
+      <div class="info-line"><span class="k">الدولة</span><span id="regEditCountry" class="v">—</span></div>
+      <div class="info-line"><span class="k">الهاتف</span><span id="regEditPhone" class="v mono" style="direction:ltr;text-align:left">—</span></div>
+      <div class="info-line"><span class="k">الحالة</span><span id="regEditStatus" class="v">—</span></div>
+      <div class="info-line"><span class="k">تاريخ التسجيل</span><span id="regEditRequestedAt" class="v">—</span></div>
+      <div class="info-line"><span class="k">المؤسسة</span><span id="regEditOrg" class="v mono" style="font-size:11px">—</span></div>
+      <div class="info-line"><span class="k">الاشتراك</span><span id="regEditSubscription" class="v">—</span></div>
+      <div class="info-line"><span class="k">القسيمة</span><span id="regEditVoucher" class="v">—</span></div>
+      <div id="regSubManageBox" class="hidden">
+        <div class="sep"></div>
+        <h3 style="margin:0 0 8px;font-size:14px;font-weight:800">إدارة الاشتراك السنوي (70$ — حاسوب + أندرويد)</h3>
+        <p class="hint" style="margin-top:0">تجديد، تمديد، أو إيقاف الوصول — المشتركون القديمون (legacy) يبقون كما هم.</p>
+        <div class="info-line"><span class="k">ينتهي</span><span id="regEditSubUntil" class="v">—</span></div>
+        <div class="info-line"><span class="k">الوصول</span><span id="regEditSubAccess" class="v">—</span></div>
+        <button type="button" class="btn btn-primary btn-block" id="regRenewSub">♻ تجديد سنوي (+365 يوم)</button>
+        <div class="grid-2" style="margin-top:8px">
+          <div class="field" style="margin-bottom:0">
+            <label class="label" for="regExtendDays">تمديد (أيام)</label>
+            <input id="regExtendDays" class="input" type="number" min="1" max="3660" value="30" />
+          </div>
+          <div class="field" style="margin-bottom:0;display:flex;align-items:flex-end">
+            <button type="button" class="btn btn-block" id="regExtendSub" style="margin:0">➕ تمديد</button>
+          </div>
+        </div>
+        <div class="field" style="margin-top:8px">
+          <label class="label" for="regSetUntil">تعيين تاريخ انتهاء</label>
+          <input id="regSetUntil" class="input" type="datetime-local" />
+        </div>
+        <button type="button" class="btn btn-block" id="regSetUntilBtn">📅 حفظ تاريخ الانتهاء</button>
+        <button type="button" class="btn btn-danger btn-block" id="regFreezeSub">⛔ إيقاف الاشتراك (تعليق الوصول)</button>
+        <button type="button" class="btn btn-success btn-block hidden" id="regUnfreezeSub">✅ إعادة تفعيل الوصول</button>
+      </div>
+      <div class="sep"></div>
+      <div class="field">
+        <label class="label" for="regEditEmail">البريد الإلكتروني</label>
+        <input id="regEditEmail" class="input" type="email" autocomplete="off" />
+        <p class="hint">يُحدَّث على الخادم وفي سجلات الاشتراك المرتبطة.</p>
+      </div>
+      <button type="button" class="btn btn-primary btn-block" id="regSaveEmail">💾 حفظ البريد</button>
+      <div class="sep"></div>
+      <div class="field">
+        <label class="label" for="regEditPassword">كلمة مرور جديدة</label>
+        <input id="regEditPassword" class="input" type="password" autocomplete="new-password" placeholder="8 أحرف على الأقل" minlength="8" />
+      </div>
+      <button type="button" class="btn btn-block" id="regSavePassword">🔑 تعيين كلمة المرور</button>
+      <div class="sep"></div>
+      <button type="button" class="btn btn-danger btn-block" id="regDeleteUser">🗑 حذف المستخدم نهائياً</button>
+      <p class="hint" style="color:var(--danger)">يحذف حساب التسجيل وسجل الترخيص المرتبط. لا يؤثر على قسائم الاشتراك.</p>
+      <div id="regVoucherLogWrap" class="hidden">
+        <div class="sep"></div>
+        <h3 style="margin:0 0 8px;font-size:14px;font-weight:800">تقرير دخول القسيمة</h3>
+        <p id="regVoucherLogSummary" class="card-sub" style="margin-top:0"></p>
+        <div class="table-wrap" style="box-shadow:none;max-height:240px;overflow:auto">
+          <table class="data">
+            <thead>
+              <tr>
+                <th>القسيمة</th>
+                <th>الجهاز</th>
+                <th>أول دخول</th>
+                <th>آخر ظهور</th>
+                <th>الحالة</th>
+              </tr>
+            </thead>
+            <tbody id="regVoucherLogBody">
+              <tr><td colspan="5" class="empty-row">—</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: voucher detail -->
+  <div class="modal-back" id="modalBack">
+    <div class="modal">
+      <div class="modal-head">
+        <h2>تفاصيل القسيمة <span id="mCode" class="mono"></span></h2>
+        <button class="icon-btn" id="mClose">✕</button>
+      </div>
+      <div class="grid-2">
+        <div>
+          <!-- بطاقة الدولة بصورة العلم (تُحدَّث ديناميكياً من dial_code) -->
+          <div id="mCountryBanner" class="country-banner empty" hidden>
+            <img id="mCountryFlag" class="flag-img" alt="flag" src="" />
+            <div class="ct-meta">
+              <span class="ct-label">دولة المشترك</span>
+              <span id="mCountryName" class="ct-name">—</span>
+              <span id="mCountryDial" class="ct-dial"></span>
+            </div>
+          </div>
+          <div class="info-line"><span class="k">الحالة</span><span id="mStatus" class="v">—</span></div>
+          <div class="info-line"><span class="k">اسم المشترك</span><span id="mName" class="v">—</span></div>
+          <div class="info-line"><span class="k">البريد</span><span id="mEmail" class="v">—</span></div>
+          <div class="info-line"><span class="k">رقم الهاتف</span><span id="mPhone" class="v mono" style="direction:ltr;text-align:left;font-size:13px">—</span></div>
+          <div class="info-line"><span class="k">الدولة</span><span id="mCountry" class="v">—</span></div>
+          <div class="info-line"><span class="k">المؤسسة</span><span id="mOrg" class="v mono" style="font-size:12px">—</span></div>
+          <div class="info-line"><span class="k">عدد الأجهزة</span><span id="mDev" class="v">—</span></div>
+          <div id="mTypedLimitsBox" class="device-limit-panel hidden">
+            <div class="info-line"><span class="k">💻 حاسوب</span><span id="mDevDesktop" class="v">—</span></div>
+            <div class="info-line"><span class="k">📱 أندرويد</span><span id="mDevAndroid" class="v">—</span></div>
+          </div>
+          <div class="info-line"><span class="k">تاريخ التوليد</span><span id="mCreated" class="v">—</span></div>
+          <div class="info-line"><span class="k">تاريخ الاسترداد</span><span id="mRedeemed" class="v">—</span></div>
+          <div class="info-line"><span class="k">سبب الإلغاء</span><span id="mReason" class="v">—</span></div>
+          <div class="sep hidden"></div>
+          <h3 class="hidden" style="margin:0 0 8px;font-size:14px;font-weight:800">☁️ سحابة الموزّعين ($50/سنة)</h3>
+          <p class="hint hidden" style="margin-top:0">تُدار عبر القسيمة — تُفعَّل عند الاسترداد أو يدوياً من هنا.</p>
+          <div class="info-line hidden"><span class="k">الحالة</span><span id="mDistCloudStatus" class="v">—</span></div>
+          <div class="info-line hidden"><span class="k">ينتهي</span><span id="mDistCloudUntil" class="v">—</span></div>
+          <div class="info-line hidden"><span class="k">مقاعد موزّعين</span><span id="mDistSeats" class="v">—</span></div>
+          <div class="grid-2 hidden" style="margin-top:8px">
+            <div class="field">
+              <label class="label" for="mDistExtendDays">تمديد (أيام)</label>
+              <input id="mDistExtendDays" class="input" type="number" min="1" max="3660" value="365" />
+            </div>
+            <div class="field">
+              <label class="label" for="mDistMaxSeats">حد المقاعد (فارغ = بلا حد)</label>
+              <input id="mDistMaxSeats" class="input" type="number" min="0" max="9999" placeholder="—" />
+            </div>
+          </div>
+          <button type="button" class="btn btn-primary btn-block hidden" id="mDistExtendBtn">☁️ تمديد سحابة الموزّعين</button>
+          <button type="button" class="btn btn-block hidden" id="mDistSetSeatsBtn">👥 حفظ حد المقاعد</button>
+          <button type="button" class="btn btn-danger btn-block hidden" id="mDistClearBtn">✕ إيقاف سحابة الموزّعين</button>
+          <button type="button" class="btn btn-success btn-block hidden" id="mDistReactivateBtn">♻ إعادة تفعيل سحابة الموزّعين</button>
+        </div>
+        <div>
+          <div class="field">
+            <label class="label" for="mNote">الملاحظة</label>
+            <input id="mNote" class="input" type="text" />
+          </div>
+          <button class="btn btn-block" id="mSaveNote">💾 حفظ الملاحظة</button>
+          <div class="sep"></div>
+          <!-- تعديل عدد أجهزة المشترك (يحفظ على السيرفر فوراً) -->
+          <div class="field">
+            <label class="label" for="mMaxDevices">عدد الأجهزة المسموح بها (إجمالي)</label>
+            <div class="row" style="flex-wrap:nowrap;gap:8px">
+              <input id="mMaxDevices" class="input num-input" type="number" min="1" max="99" step="1" style="max-width:120px" />
+              <button class="btn" id="mSaveMaxDevices" style="flex:1">💾 حفظ العدد</button>
+            </div>
+            <p class="hint">للقسائم القديمة: حد إجمالي فقط. للقسائم الجديدة استخدم التحديد حسب النوع أدناه.</p>
+          </div>
+          <label class="label" style="display:flex;align-items:center;gap:8px;margin:10px 0 8px;cursor:pointer">
+            <input id="mUseTyped" type="checkbox" />
+            <span>تحديد حسب نوع الجهاز</span>
+          </label>
+          <div id="mTypedEditPanel" class="device-limit-panel hidden">
+            <div class="typed-limit-grid">
+              <div class="field" style="margin-bottom:0">
+                <label class="label" for="mMaxDesktop">💻 حاسوب</label>
+                <input id="mMaxDesktop" class="input" type="number" min="0" max="50" value="0" />
+              </div>
+              <div class="field" style="margin-bottom:0">
+                <label class="label" for="mMaxAndroid">📱 أندرويد</label>
+                <input id="mMaxAndroid" class="input" type="number" min="0" max="50" value="0" />
+              </div>
+            </div>
+            <button class="btn btn-block" id="mSaveTypedLimits" style="margin-top:10px">💾 حفظ حدود الأجهزة</button>
+          </div>
+          <div class="sep"></div>
+          <button class="btn btn-danger btn-block hidden" id="mRevoke">🚫 إلغاء القسيمة كاملة</button>
+          <button class="btn btn-block hidden" id="mRestore">♻ استعادة القسيمة</button>
+          <div class="sep"></div>
+          <button class="btn btn-danger btn-block" id="mDelete" title="حذف القسيمة من القاعدة نهائياً">🗑 حذف نهائي من القائمة</button>
+          <p class="hint" style="color:var(--danger)">الحذف النهائي يَمسح القسيمة وأجهزتها من قاعدة البيانات ولا يمكن التراجع عنه.</p>
+        </div>
+      </div>
+      <div class="sep"></div>
+      <h3 style="margin:8px 0 6px;font-size:14px;font-weight:800">تقرير دخول القسيمة / الأجهزة</h3>
+      <p id="mDeviceStats" class="card-sub" style="margin-top:0;margin-bottom:10px">—</p>
+      <div class="table-wrap" style="box-shadow:none">
+        <table class="data">
+          <thead>
+            <tr><th>الجهاز</th><th>النوع</th><th>installation_id</th><th>أول دخول</th><th>آخر ظهور</th><th>الحالة</th><th></th></tr>
+          </thead>
+          <tbody id="mDevices"><tr><td colspan="7" class="empty-row">—</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+(function () {
+  const TOKEN_KEY = 'mizapos_activation_admin_jwt';
+  // مهاجرة شفّافة من المفتاح القديم: إذا وُجد توكن بالاسم السابق ولم يكن
+  // الجديد محدّداً، ننقل القيمة لمرّة واحدة ثم نحذف القديم. لا تأثير على
+  // أيّ مستخدم — أسوأ حالة: إعادة تسجيل دخول واحدة لو كان كلاهما فارغ.
+  (function migrateLegacyToken() {
+    try {
+      const LEGACY_KEY = 'hsnposs_activation_admin_jwt';
+      const legacy = localStorage.getItem(LEGACY_KEY);
+      const current = localStorage.getItem(TOKEN_KEY);
+      if (legacy && !current) localStorage.setItem(TOKEN_KEY, legacy);
+      if (legacy) localStorage.removeItem(LEGACY_KEY);
+    } catch (_) { /* تجاهَل */ }
+  })();
+  const state = {
+    token: localStorage.getItem(TOKEN_KEY) || '',
+    email: '',
+    list: [],
+    stats: { unused: 0, redeemed: 0, revoked: 0, total: 0 },
+    selected: null,
+    lastBatch: null,
+    page: 1,
+    pageSize: 50,
+    totalFiltered: 0,
+    registrations: {
+      list: [],
+      page: 1,
+      pageSize: 50,
+      total: 0,
+      stats: { total: 0, approved: 0, pending: 0, rejected: 0 },
+      selected: null,
+    },
+    currentPanel: 'generate',
+  };
+
+  const PANEL_MAP = {
+    generate: { panel: 'panel-generate', nav: 'navGenerate' },
+    list: { panel: 'panel-list', nav: 'navList' },
+    registered: { panel: 'panel-registered', nav: 'navRegistered' },
+    vouchers: { panel: 'panel-list', nav: 'navList' },
+  };
+
+  function panelFromHash() {
+    const h = (location.hash || '').replace(/^#/, '').trim().toLowerCase();
+    if (h === 'vouchers') return 'list';
+    return PANEL_MAP[h] ? h : 'generate';
+  }
+
+  function switchPanel(name, opts) {
+    opts = opts || {};
+    if (name === 'vouchers') name = 'list';
+    if (!PANEL_MAP[name]) name = 'generate';
+    state.currentPanel = name;
+    Object.keys(PANEL_MAP).forEach((key) => {
+      if (key === 'vouchers') return;
+      const cfg = PANEL_MAP[key];
+      const pel = $(cfg.panel);
+      const nel = $(cfg.nav);
+      const active = key === name;
+      if (pel) pel.classList.toggle('hidden', !active);
+      if (nel) nel.classList.toggle('active', active);
+    });
+    if (!opts.skipHash) {
+      const hash = name === 'generate' ? '' : '#' + name;
+      if (location.hash !== hash) {
+        history.replaceState(null, '', location.pathname + location.search + hash);
+      }
+    }
+    try { sessionStorage.setItem('vouchersPanel', name); } catch (_e) { /* ignore */ }
+    if (name === 'registered' && opts.reloadReg !== false) reloadRegistrations(true);
+    if (name === 'list' && opts.reloadList !== false) reloadList(false);
+  }
+
+  function initPanel() {
+    let name = panelFromHash();
+    if (!location.hash) {
+      try {
+        const saved = sessionStorage.getItem('vouchersPanel');
+        if (saved === 'vouchers') name = 'list';
+        else if (saved === 'broadcast') name = 'generate';
+        else if (saved && PANEL_MAP[saved]) name = saved;
+      } catch (_e) { /* ignore */ }
+    }
+    switchPanel(name, { skipHash: !location.hash, reloadReg: name === 'registered', reloadList: name === 'list' });
+  }
+
+  // رموز الدول المطابقة لتطبيق MizaPos (auth_dial_codes.dart)
+  const COUNTRY_BY_DIAL = {
+    '+970': { name: 'فلسطين', iso: 'ps' },
+    '+972': { name: 'فلسطين', iso: 'ps' },
+    '+962': { name: 'الأردن', iso: 'jo' },
+    '+961': { name: 'لبنان', iso: 'lb' },
+    '+963': { name: 'سوريا', iso: 'sy' },
+    '+964': { name: 'العراق', iso: 'iq' },
+    '+967': { name: 'اليمن', iso: 'ye' },
+    '+20':  { name: 'مصر', iso: 'eg' },
+    '+249': { name: 'السودان', iso: 'sd' },
+    '+211': { name: 'جنوب السودان', iso: 'ss' },
+    '+218': { name: 'ليبيا', iso: 'ly' },
+    '+216': { name: 'تونس', iso: 'tn' },
+    '+213': { name: 'الجزائر', iso: 'dz' },
+    '+212': { name: 'المغرب', iso: 'ma' },
+    '+222': { name: 'موريتانيا', iso: 'mr' },
+    '+966': { name: 'السعودية', iso: 'sa' },
+    '+971': { name: 'الإمارات', iso: 'ae' },
+    '+965': { name: 'الكويت', iso: 'kw' },
+    '+973': { name: 'البحرين', iso: 'bh' },
+    '+968': { name: 'عُمان', iso: 'om' },
+    '+974': { name: 'قطر', iso: 'qa' },
+    '+90':  { name: 'تركيا', iso: 'tr' },
+    '+98':  { name: 'إيران', iso: 'ir' },
+    '+93':  { name: 'أفغانستان', iso: 'af' },
+    '+92':  { name: 'باكستان', iso: 'pk' },
+    '+91':  { name: 'الهند', iso: 'in' },
+    '+880': { name: 'بنغلاديش', iso: 'bd' },
+    '+7':   { name: 'روسيا', iso: 'ru' },
+    '+380': { name: 'أوكرانيا', iso: 'ua' },
+    '+44':  { name: 'بريطانيا', iso: 'gb' },
+    '+33':  { name: 'فرنسا', iso: 'fr' },
+    '+49':  { name: 'ألمانيا', iso: 'de' },
+    '+39':  { name: 'إيطاليا', iso: 'it' },
+    '+34':  { name: 'إسبانيا', iso: 'es' },
+    '+31':  { name: 'هولندا', iso: 'nl' },
+    '+32':  { name: 'بلجيكا', iso: 'be' },
+    '+41':  { name: 'سويسرا', iso: 'ch' },
+    '+43':  { name: 'النمسا', iso: 'at' },
+    '+46':  { name: 'السويد', iso: 'se' },
+    '+47':  { name: 'النرويج', iso: 'no' },
+    '+45':  { name: 'الدنمارك', iso: 'dk' },
+    '+358': { name: 'فنلندا', iso: 'fi' },
+    '+353': { name: 'أيرلندا', iso: 'ie' },
+    '+30':  { name: 'اليونان', iso: 'gr' },
+    '+351': { name: 'البرتغال', iso: 'pt' },
+    '+48':  { name: 'بولندا', iso: 'pl' },
+    '+420': { name: 'التشيك', iso: 'cz' },
+    '+36':  { name: 'المجر', iso: 'hu' },
+    '+40':  { name: 'رومانيا', iso: 'ro' },
+    '+359': { name: 'بلغاريا', iso: 'bg' },
+    '+385': { name: 'كرواتيا', iso: 'hr' },
+    '+381': { name: 'صربيا', iso: 'rs' },
+    '+387': { name: 'البوسنة', iso: 'ba' },
+    '+355': { name: 'ألبانيا', iso: 'al' },
+    '+1':   { name: 'أمريكا/كندا', iso: 'us' },
+    '+52':  { name: 'المكسيك', iso: 'mx' },
+    '+55':  { name: 'البرازيل', iso: 'br' },
+    '+54':  { name: 'الأرجنتين', iso: 'ar' },
+    '+56':  { name: 'تشيلي', iso: 'cl' },
+    '+57':  { name: 'كولومبيا', iso: 'co' },
+    '+51':  { name: 'بيرو', iso: 'pe' },
+  };
+  const COUNTRY_DIAL_KEYS = Object.keys(COUNTRY_BY_DIAL).sort((a, b) => b.length - a.length);
+
+  const FLAG_CDN = 'https://flagcdn.com';
+  function normalizeDial(dial) {
+    let d = String(dial == null ? '' : dial).trim().replace(/\s+/g, '');
+    if (!d) return '';
+    if (d.startsWith('00')) d = '+' + d.slice(2);
+    else if (d[0] !== '+') d = '+' + d.replace(/^0+/, '');
+    return d;
+  }
+  function flagSrc(iso2, width) {
+    if (!iso2) return '';
+    const w = Math.max(16, Math.min(160, width | 0 || 40));
+    return FLAG_CDN + '/w' + w + '/' + iso2.toLowerCase() + '.png';
+  }
+  function flagSrcSet(iso2, width) {
+    if (!iso2) return '';
+    return flagSrc(iso2, width * 2) + ' 2x';
+  }
+  // يعيد عنصر <img> جاهز للحقن (سلسلة HTML آمنة)
+  function flagImgHtml(iso2, opts) {
+    if (!iso2) return '';
+    const cls = (opts && opts.className) || 'flag-mini';
+    const width = (opts && opts.width) || 18;
+    const title = (opts && opts.title) ? ' title="' + safe(opts.title) + '"' : '';
+    const alt = (opts && opts.alt) ? ' alt="' + safe(opts.alt) + '"' : ' alt="flag"';
+    return '<img class="' + cls + '"' + title + alt
+      + ' src="' + flagSrc(iso2, width) + '"'
+      + ' srcset="' + flagSrcSet(iso2, width) + '"'
+      + ' loading="lazy" referrerpolicy="no-referrer"'
+      + ' onerror="this.style.display=\'none\'" />';
+  }
+  function countryFromDial(dial) {
+    const key = normalizeDial(dial);
+    if (!key) return null;
+    if (COUNTRY_BY_DIAL[key]) return Object.assign({ dial: key }, COUNTRY_BY_DIAL[key]);
+    for (let i = 0; i < COUNTRY_DIAL_KEYS.length; i++) {
+      const k = COUNTRY_DIAL_KEYS[i];
+      if (key.indexOf(k) === 0) return Object.assign({ dial: k }, COUNTRY_BY_DIAL[k]);
+    }
+    return { dial: key, name: key, iso: null };
+  }
+  function countryChipHtml(dial, text, opts) {
+    const cinfo = countryFromDial(dial);
+    if (!cinfo) return safe(text || '—');
+    const width = (opts && opts.flagWidth) || 18;
+    const cls = (opts && opts.flagClass) || 'flag-mini';
+    const flag = cinfo.iso
+      ? flagImgHtml(cinfo.iso, { className: cls, width: width, alt: cinfo.name, title: cinfo.name })
+      : '';
+    const label = text != null && String(text).trim() !== '' ? String(text) : cinfo.name;
+    const title = cinfo.name + (cinfo.dial ? ' ' + cinfo.dial : '') + (text ? ' — ' + label : '');
+    return '<span class="flag-chip" title="' + safe(title) + '">' + flag
+      + '<span class="flag-text">' + safe(label) + '</span></span>';
+  }
+
+  const $ = (id) => document.getElementById(id);
+  const safe = (v) =>
+    String(v == null ? '' : v).replace(/[&<>"']/g, (m) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    }[m]));
+  const fmtDate = (v) => {
+    if (!v) return '—';
+    const d = new Date(v);
+    if (Number.isNaN(d.getTime())) return String(v);
+    return d.toLocaleString('ar', { dateStyle: 'short', timeStyle: 'short' });
+  };
+
+  function toast(msg, type) {
+    const wrap = $('toasts');
+    if (!wrap) return;
+    const t = document.createElement('div');
+    t.className = 'toast ' + (type === 'err' ? 'toast--err' : type === 'warn' ? 'toast--warn' : 'toast--ok');
+    t.textContent = msg;
+    wrap.appendChild(t);
+    setTimeout(() => {
+      t.style.opacity = '0';
+      t.style.transform = 'translateY(-6px)';
+      t.style.transition = 'all 0.25s';
+      setTimeout(() => t.remove(), 280);
+    }, 4500);
+  }
+
+  function setBusy(btn, busy) {
+    if (!btn) return;
+    if (busy) {
+      if (!btn.dataset.label) btn.dataset.label = btn.textContent || '';
+      btn.disabled = true;
+      btn.textContent = '… جارٍ التنفيذ';
+    } else {
+      btn.disabled = false;
+      if (btn.dataset.label) btn.textContent = btn.dataset.label;
+    }
+  }
+
+  function apiRoot() {
+    const m = document.querySelector('meta[name="activation-api-base"]');
+    const v = String((m && m.getAttribute('content')) || '').trim();
+    if (v && v !== '__ACTIVATION_BASE__') return v.replace(/\/$/, '');
+    const path = location.pathname;
+    if (path.includes('/public/')) return path.slice(0, path.indexOf('/public/'));
+    return path.replace(/\/(?:index\.php\/.*|vouchers\/?|[^/]+\.html?)$/i, '') || '';
+  }
+  const apiUrl = (p) => apiRoot() + (p.startsWith('/') ? p : '/' + p);
+  const authHeaders = () => ({
+    'Content-Type': 'application/json',
+    Authorization: 'Bearer ' + (state.token || ''),
+  });
+
+  function statusPill(s) {
+    if (s === 'unused') return '<span class="pill pill--warn">غير مستخدمة</span>';
+    if (s === 'redeemed') return '<span class="pill pill--ok">مُستخدمة</span>';
+    if (s === 'revoked') return '<span class="pill pill--danger">ملغاة</span>';
+    return '<span class="pill pill--info">' + safe(s) + '</span>';
+  }
+
+  function signupStatusPill(s) {
+    if (s === 'approved') return '<span class="pill pill--ok">مُعتمد</span>';
+    if (s === 'pending') return '<span class="pill pill--warn">قيد الانتظار</span>';
+    if (s === 'rejected') return '<span class="pill pill--danger">مرفوض</span>';
+    return '<span class="pill pill--info">' + safe(s || '—') + '</span>';
+  }
+
+  function emailVerifiedPill(v) {
+    if (v === true || v === 1 || v === '1') {
+      return '<span class="pill pill--ok">مُؤكَّد</span>';
+    }
+    return '<span class="pill pill--warn">غير مُؤكَّد</span>';
+  }
+
+  function voucherLinkPill(r) {
+    if (!r || !r.has_voucher) {
+      return '<span class="pill pill--info">غير مرتبط</span>';
+    }
+    const code = r.voucher_code || '';
+    const st = r.voucher_status || '';
+    const extra = (r.voucher_count > 1) ? (' (+' + (r.voucher_count - 1) + ')') : '';
+    const title = code + extra;
+    if (st === 'revoked') {
+      return '<span class="pill pill--danger" title="' + safe(title) + '">ملغاة · <span class="mono">' + safe(code) + '</span>' + safe(extra) + '</span>';
+    }
+    return '<span class="pill pill--ok" title="' + safe(title) + '">مرتبط · <span class="mono">' + safe(code) + '</span>' + safe(extra) + '</span>';
+  }
+
+  function voucherLinkText(r) {
+    if (!r || !r.has_voucher) return 'غير مرتبط بقسيمة';
+    const code = r.voucher_code || '—';
+    const st = r.voucher_status === 'revoked' ? ' (ملغاة)' : '';
+    const extra = (r.voucher_count > 1) ? (' — ' + r.voucher_count + ' قسائم') : '';
+    return 'مرتبط · ' + code + st + extra;
+  }
+
+  function deviceEntryStatusPill(isActive) {
+    return isActive
+      ? '<span class="pill pill--ok">نشط</span>'
+      : '<span class="pill pill--danger">ملغى/مكرر</span>';
+  }
+
+  function renderVoucherActivityLog(entries, summaryEl, bodyEl, wrapEl) {
+    if (!bodyEl) return;
+    if (!entries || !entries.length) {
+      if (wrapEl) wrapEl.classList.add('hidden');
+      return;
+    }
+    if (wrapEl) wrapEl.classList.remove('hidden');
+    bodyEl.innerHTML = entries.map((e) => {
+      const dev = (e.computerName || '—')
+        + (e.osName ? '<div style="color:#64748b;font-size:11px">' + safe(e.osName) + '</div>' : '');
+      const iid = (e.installationId || '').slice(0, 16);
+      return ''
+        + '<tr>'
+        + '<td class="mono" style="font-size:11px;font-weight:700">' + safe(e.voucherCode || '—') + '</td>'
+        + '<td>' + dev + '</td>'
+        + '<td style="font-size:12px">' + safe(fmtDate(e.redeemedAt)) + '</td>'
+        + '<td style="font-size:12px">' + safe(fmtDate(e.lastSeenAt)) + '</td>'
+        + '<td>' + deviceEntryStatusPill(!!e.isActive) + '</td>'
+        + '</tr>';
+    }).join('');
+    if (summaryEl && entries.length) {
+      /* filled by caller */
+    }
+  }
+
+  async function loadRegVoucherActivity(row) {
+    const wrap = $('regVoucherLogWrap');
+    const summary = $('regVoucherLogSummary');
+    const body = $('regVoucherLogBody');
+    if (!wrap || !row || !row.has_voucher) {
+      if (wrap) wrap.classList.add('hidden');
+      return;
+    }
+    wrap.classList.remove('hidden');
+    if (summary) summary.textContent = 'جارٍ تحميل تقرير الدخول…';
+    if (body) body.innerHTML = '<tr><td colspan="5" class="empty-row">…</td></tr>';
+    try {
+      const params = new URLSearchParams({
+        organizationId: row.organization_id || '',
+        email: (row.email || '').trim().toLowerCase(),
+      });
+      const res = await fetch(apiUrl('/admin/signups/voucher-activity?' + params.toString()), { headers: authHeaders() });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        if (summary) summary.textContent = 'تعذّر تحميل تقرير الدخول.';
+        return;
+      }
+      const vouchers = data.vouchers || [];
+      const entries = data.entries || [];
+      const deduped = Number(data.dedupedRows) || 0;
+      let sum = vouchers.length
+        ? ('قسائم مرتبطة: ' + vouchers.length
+          + ' — أجهزة نشطة: '
+          + vouchers.reduce((n, v) => n + (Number(v.activeDevices) || 0), 0)
+          + ' / '
+          + vouchers.reduce((n, v) => n + (Number(v.maxDevices) || 0), 0))
+        : 'لا توجد قسائم مرتبطة.';
+      if (deduped > 0) {
+        sum += ' — تم تصحيح ' + deduped + ' سجل مكرر لنفس الجهاز (بدون إلغاء الجهاز النشط).';
+      }
+      if (summary) summary.textContent = sum;
+      renderVoucherActivityLog(entries, summary, body, wrap);
+    } catch (_e) {
+      if (summary) summary.textContent = 'تعذّر الاتصال بالخادم.';
+    }
+  }
+
+  function subscriptionHint(row) {
+    if (row.subscription_is_legacy) return 'قديم (legacy) — كامل';
+    if (row.access_suspended) return '⛔ موقوف';
+    const days = row.subscription_days_remaining;
+    const until = row.subscription_effective_until;
+    if (days != null && days > 0) {
+      return days + ' يوم متبقٍ' + (until ? ' — حتى ' + fmtDate(until) : '');
+    }
+    const trial = row.trial_days_remaining;
+    if (trial != null && trial > 0) return 'تجربة: ' + trial + ' يوم';
+    if (until) return 'منتهٍ — كان حتى ' + fmtDate(until);
+    return '—';
+  }
+
+  function renderRegSubscriptionPanel(row) {
+    const box = $('regSubManageBox');
+    const freezeBtn = $('regFreezeSub');
+    const unfreezeBtn = $('regUnfreezeSub');
+    if (!box) return;
+    if (!row || row.subscription_is_legacy) {
+      box.classList.add('hidden');
+      return;
+    }
+    box.classList.remove('hidden');
+    const untilEl = $('regEditSubUntil');
+    const accessEl = $('regEditSubAccess');
+    const until = row.subscription_effective_until;
+    if (untilEl) {
+      untilEl.textContent = until ? fmtDate(until) : '—';
+    }
+    if (accessEl) {
+      accessEl.textContent = row.access_suspended
+        ? '⛔ موقوف'
+        : (row.subscription_days_remaining != null && row.subscription_days_remaining > 0 ? '✅ نشط' : '—');
+    }
+    if (freezeBtn) freezeBtn.classList.toggle('hidden', !!row.access_suspended);
+    if (unfreezeBtn) unfreezeBtn.classList.toggle('hidden', !row.access_suspended);
+    const setUntil = $('regSetUntil');
+    if (setUntil && until) {
+      try {
+        const d = new Date(until);
+        if (!Number.isNaN(d.getTime())) {
+          const pad = (n) => String(n).padStart(2, '0');
+          setUntil.value = d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate())
+            + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+        }
+      } catch (_e) { /* ignore */ }
+    }
+  }
+
+  async function applyRegLicense(action, extra) {
+    const sel = state.registrations.selected;
+    if (!sel) return null;
+    const email = (sel.email || '').trim().toLowerCase();
+    const res = await fetch(apiUrl('/admin/licenses/apply'), {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify(Object.assign({
+        organizationId: sel.organization_id,
+        email,
+        action,
+      }, extra || {})),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.status === 401) { logout(); return null; }
+    if (!res.ok || !data.ok) {
+      toast(regApiError(data, res.status, 'فشل تحديث الاشتراك.'), 'err');
+      return null;
+    }
+    return data;
+  }
+
+  async function refreshRegEditAfterLicense() {
+    const sel = state.registrations.selected;
+    if (!sel) return;
+    await reloadRegistrations(false);
+    const updated = state.registrations.list.find((x) => x.id === sel.id);
+    if (updated) {
+      state.registrations.selected = updated;
+      $('regEditSubscription').textContent = subscriptionHint(updated);
+      renderRegSubscriptionPanel(updated);
+    }
+  }
+
+  function loginErrorMessage(data, status) {
+    const code = data && data.error;
+    if (code === 'unauthorized') return 'كلمة المرور غير صحيحة، أو البريد لا يطابق أي مسؤول في قاعدة البيانات.';
+    if (code === 'disabled') return 'هذا الحساب معطّل.';
+    if (code === 'admin_not_configured') return 'لم يُضبط أي مسؤول بعد. استخدم admin_reset.php.';
+    if (code === 'validation') return 'أدخل كلمة مرور (4 أحرف على الأقل).';
+    if (status === 503) return 'الخادم غير مهيأ (503).';
+    if (status === 0 || !navigator.onLine) return 'لا اتصال أو تعذّر الوصول للخادم.';
+    return code ? 'فشل الدخول: ' + code : 'فشل الدخول (HTTP ' + status + ').';
+  }
+
+  function showDiag(lines) {
+    const box = $('diagBox');
+    if (!box) return;
+    box.classList.remove('hidden');
+    box.textContent = lines.join('\n');
+  }
+
+  async function login(ev) {
+    if (ev) ev.preventDefault();
+    const email = ($('admEmail').value || '').trim();
+    const password = $('admPass').value || '';
+    if (!password || password.length < 4) {
+      toast('أدخل كلمة مرور لا تقل عن 4 أحرف.', 'err');
+      return;
+    }
+    if (email && !email.includes('@')) {
+      toast('البريد يجب أن يحتوي على @ أو اتركه فارغاً.', 'err');
+      return;
+    }
+    const btn = $('btnLogin');
+    setBusy(btn, true);
+    const url = apiUrl('/admin/login');
+    let status = 0;
+    let rawBody = '';
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+        credentials: 'omit',
+      });
+      status = res.status;
+      rawBody = await res.text();
+      let data = {};
+      try { data = rawBody ? JSON.parse(rawBody) : {}; } catch (_p) { /* not json */ }
+
+      if (!res.ok || !data.token) {
+        toast(loginErrorMessage(data, status), 'err');
+        showDiag([
+          'POST ' + url,
+          'HTTP ' + status,
+          'email sent: ' + (email || '(empty)'),
+          'password length: ' + password.length,
+          'response: ' + rawBody.slice(0, 800),
+        ]);
+        return;
+      }
+      state.token = data.token;
+      state.email = email || (data.legacy ? '(legacy)' : '');
+      localStorage.setItem(TOKEN_KEY, data.token);
+      showApp();
+      await reloadList();
+      toast('تم تسجيل الدخول بنجاح', 'ok');
+    } catch (e) {
+      toast('تعذّر الاتصال بالخادم.', 'err');
+      showDiag([
+        'POST ' + url,
+        'network/exception: ' + (e && e.message ? e.message : String(e)),
+        'email sent: ' + (email || '(empty)'),
+        'password length: ' + password.length,
+      ]);
+    } finally {
+      setBusy(btn, false);
+    }
+  }
+
+  async function runDiagnostics() {
+    const url = apiUrl('/admin/login');
+    const healthUrl = apiUrl('/api/health');
+    const lines = [
+      'Page URL: ' + location.href,
+      'Detected API root: ' + apiRoot(),
+      'Login URL: ' + url,
+      'Stored token: ' + (state.token ? state.token.slice(0, 20) + '…' : '(empty)'),
+      '',
+      'Checking /api/health …',
+    ];
+    showDiag(lines);
+    try {
+      const r = await fetch(healthUrl, { method: 'GET' });
+      const txt = await r.text();
+      lines.push('HTTP ' + r.status);
+      lines.push('body: ' + txt.slice(0, 200));
+    } catch (e) {
+      lines.push('network error: ' + (e && e.message ? e.message : String(e)));
+    }
+    lines.push('');
+    lines.push('Test POST /admin/login with email="" password="xxxx" (expect 400/401) …');
+    try {
+      const r = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: '', password: 'xxxx' }),
+        credentials: 'omit',
+      });
+      const txt = await r.text();
+      lines.push('HTTP ' + r.status);
+      lines.push('body: ' + txt.slice(0, 200));
+    } catch (e) {
+      lines.push('network error: ' + (e && e.message ? e.message : String(e)));
+    }
+    showDiag(lines);
+  }
+
+  function logout() {
+    state.token = '';
+    state.email = '';
+    localStorage.removeItem(TOKEN_KEY);
+    showLogin();
+  }
+
+  function showApp() {
+    $('loginScreen').classList.add('hidden');
+    $('appScreen').classList.remove('hidden');
+    $('adminEmailBadge').textContent = state.email || '👤';
+    loadSignupStats();
+    initPanel();
+  }
+  function showLogin() {
+    $('appScreen').classList.add('hidden');
+    $('loginScreen').classList.remove('hidden');
+    $('admPass').value = '';
+  }
+
+  function platformLabel(raw, osName) {
+    const p = String(raw || '').toLowerCase();
+    const os = String(osName || '').toLowerCase();
+    if (p === 'android' || os.includes('android')) return { label: 'أندرويد', cls: 'android', icon: '📱' };
+    return { label: 'حاسوب', cls: 'desktop', icon: '💻' };
+  }
+
+  function devicesCell(v) {
+    if (v.useTypedDeviceLimits) {
+      const dUsed = v.usedDesktopDevices != null ? v.usedDesktopDevices : 0;
+      const dMax = v.maxDesktopDevices != null ? v.maxDesktopDevices : 0;
+      const aUsed = v.usedAndroidDevices != null ? v.usedAndroidDevices : 0;
+      const aMax = v.maxAndroidDevices != null ? v.maxAndroidDevices : 0;
+      return '💻 <strong>' + dUsed + '</strong>/' + dMax
+        + ' · 📱 <strong>' + aUsed + '</strong>/' + aMax;
+    }
+    return '<strong>' + v.usedDevices + '</strong>/' + v.maxDevices;
+  }
+
+  function syncGenTypedPanel() {
+    const useTyped = $('genUseTyped') && $('genUseTyped').checked;
+    $('genTypedPanel') && $('genTypedPanel').classList.toggle('hidden', !useTyped);
+    if ($('genMax')) {
+      $('genMax').readOnly = !!useTyped;
+      if (useTyped) {
+        const d = parseInt($('genMaxDesktop').value, 10) || 0;
+        const a = parseInt($('genMaxAndroid').value, 10) || 0;
+        $('genMax').value = String(Math.max(1, d + a));
+      }
+    }
+  }
+
+  function syncModalTypedPanel() {
+    const useTyped = $('mUseTyped') && $('mUseTyped').checked;
+    $('mTypedEditPanel') && $('mTypedEditPanel').classList.toggle('hidden', !useTyped);
+    $('mTypedLimitsBox') && $('mTypedLimitsBox').classList.toggle('hidden', !useTyped);
+  }
+
+  function distCloudBadge(v) {
+    if (!v || !v.distributorCloudEnabled) {
+      return '<span class="cloud-badge off">—</span>';
+    }
+    if (v.distributorCloudActive) {
+      return '<span class="cloud-badge">☁️ ساري</span>';
+    }
+    if (v.distributorCloudDays > 0 && !v.distributorCloudUntil) {
+      return '<span class="cloud-badge">☁️ ' + v.distributorCloudDays + ' يوم</span>';
+    }
+    return '<span class="cloud-badge off">منتهي</span>';
+  }
+
+  function syncGenDistCloudPanel() {
+    const on = $('genIncludeDistCloud') && $('genIncludeDistCloud').checked;
+    $('genDistCloudPanel') && $('genDistCloudPanel').classList.toggle('hidden', !on);
+  }
+
+  function renderVoucherDistributorCloud(v) {
+    const statusEl = $('mDistCloudStatus');
+    const untilEl = $('mDistCloudUntil');
+    const seatsEl = $('mDistSeats');
+    const maxInput = $('mDistMaxSeats');
+    const extendBtn = $('mDistExtendBtn');
+    const seatsBtn = $('mDistSetSeatsBtn');
+    const clearBtn = $('mDistClearBtn');
+    const reactivateBtn = $('mDistReactivateBtn');
+    if (!statusEl || !untilEl || !seatsEl || !v) return;
+    const active = v.distributorCloudActive === true;
+    const pending = !active && v.distributorCloudDays > 0 && !v.distributorCloudUntil;
+    const stopped = !active && !pending;
+    statusEl.textContent = active
+      ? 'ساري'
+      : (pending ? 'مُرفق بالقسيمة' : (v.distributorCloudUntil ? 'موقوف / منتهي' : 'غير مفعّل'));
+    statusEl.className = 'v ' + (active ? 'pill pill--ok' : (pending ? 'pill pill--info' : 'pill pill--danger'));
+    untilEl.textContent = v.distributorCloudUntil
+      ? fmtDate(v.distributorCloudUntil)
+      : (pending ? (v.distributorCloudDays + ' يوم عند الاسترداد') : '—');
+    const used = v.usedDistributorSeats != null ? Number(v.usedDistributorSeats) : 0;
+    const max = v.maxDistributorSeats != null && v.maxDistributorSeats !== ''
+      ? Number(v.maxDistributorSeats)
+      : null;
+    seatsEl.textContent = max != null ? (used + ' / ' + max) : (used + ' / ∞');
+    if (maxInput) maxInput.value = max != null ? String(max) : '';
+    if (extendBtn) extendBtn.classList.toggle('hidden', stopped);
+    if (seatsBtn) seatsBtn.classList.toggle('hidden', stopped);
+    if (clearBtn) clearBtn.classList.toggle('hidden', stopped);
+    if (reactivateBtn) reactivateBtn.classList.toggle('hidden', !stopped);
+  }
+
+  async function postVoucherDistributorCloud(action, extra) {
+    const sel = state.selected;
+    if (!sel || !sel.code) return null;
+    const body = { code: sel.code, action, ...(extra || {}) };
+    const res = await fetch(apiUrl('/admin/vouchers/distributor-cloud'), {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify(body),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.status === 401) { logout(); return null; }
+    if (!res.ok || !data.ok) {
+      toast((data && data.error) ? data.error : 'فشل تحديث سحابة الموزّعين.', 'err');
+      return null;
+    }
+    Object.assign(sel, data);
+    sel.distributorCloudEnabled = !!(sel.distributorCloudDays || sel.distributorCloudUntil);
+    renderVoucherDistributorCloud(sel);
+    toast('تم تحديث سحابة الموزّعين', 'ok');
+    return data;
+  }
+
+  async function extendVoucherDistributorCloud() {
+    const days = Math.max(1, Math.min(3660, parseInt($('mDistExtendDays')?.value, 10) || 365));
+    const btn = $('mDistExtendBtn');
+    setBusy(btn, true);
+    try {
+      const data = await postVoucherDistributorCloud('extend_distributor_cloud', { days });
+      if (data) await openDetail(state.selected.code);
+    } finally {
+      setBusy(btn, false);
+    }
+  }
+
+  async function setVoucherDistributorSeats() {
+    const raw = ($('mDistMaxSeats')?.value || '').trim();
+    const seats = raw === '' ? null : Math.max(0, Math.min(9999, parseInt(raw, 10) || 0));
+    const btn = $('mDistSetSeatsBtn');
+    setBusy(btn, true);
+    try {
+      await postVoucherDistributorCloud('set_distributor_seats', { maxDistributorSeats: seats });
+    } finally {
+      setBusy(btn, false);
+    }
+  }
+
+  async function clearVoucherDistributorCloud() {
+    if (!window.confirm('إيقاف سحابة الموزّعين لهذه القسيمة؟')) return;
+    const btn = $('mDistClearBtn');
+    setBusy(btn, true);
+    try {
+      const data = await postVoucherDistributorCloud('clear_distributor_cloud', {});
+      if (data) await openDetail(state.selected.code);
+    } finally {
+      setBusy(btn, false);
+    }
+  }
+
+  async function reactivateVoucherDistributorCloud() {
+    const days = Math.max(1, Math.min(3660, parseInt($('mDistExtendDays')?.value, 10) || 365));
+    const raw = ($('mDistMaxSeats')?.value || '').trim();
+    const seats = raw === '' ? null : Math.max(0, Math.min(9999, parseInt(raw, 10) || 0));
+    const seatsHint = seats != null ? (' وحد المقاعد: ' + seats) : '';
+    if (!window.confirm('إعادة تفعيل سحابة الموزّعين لمدة ' + days + ' يوماً' + seatsHint + '؟')) return;
+    const btn = $('mDistReactivateBtn');
+    setBusy(btn, true);
+    try {
+      const data = await postVoucherDistributorCloud('enable_distributor_cloud', {
+        days,
+        maxDistributorSeats: seats,
+      });
+      if (data) await openDetail(state.selected.code);
+    } finally {
+      setBusy(btn, false);
+    }
+  }
+
+  async function generate(ev) {
+    if (ev) ev.preventDefault();
+    const count = Math.max(1, Math.min(500, parseInt($('genCount').value, 10) || 1));
+    const useTyped = $('genUseTyped') && $('genUseTyped').checked;
+    const maxDevices = Math.max(1, Math.min(99, parseInt($('genMax').value, 10) || 1));
+    const maxDesktop = Math.max(0, Math.min(50, parseInt($('genMaxDesktop').value, 10) || 0));
+    const maxAndroid = Math.max(0, Math.min(50, parseInt($('genMaxAndroid').value, 10) || 0));
+    const note = ($('genNote').value || '').trim();
+    const btn = $('btnGenerate');
+    setBusy(btn, true);
+    try {
+      const payload = { count, maxDevices, note, useTypedDeviceLimits: useTyped };
+      if (useTyped) {
+        payload.maxDesktopDevices = maxDesktop;
+        payload.maxAndroidDevices = maxAndroid;
+      }
+      if ($('genIncludeDistCloud') && $('genIncludeDistCloud').checked) {
+        payload.includeDistributorCloud = true;
+        payload.distributorCloudDays = Math.max(1, Math.min(3660, parseInt($('genDistCloudDays').value, 10) || 365));
+        const seatsRaw = ($('genDistSeats').value || '').trim();
+        if (seatsRaw !== '') payload.maxDistributorSeats = Math.max(0, Math.min(9999, parseInt(seatsRaw, 10) || 0));
+      }
+      const res = await fetch(apiUrl('/admin/vouchers/generate'), {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 401) { toast('الجلسة منتهية. سجّل دخولك مجدداً.', 'err'); logout(); return; }
+      if (!res.ok || !data.ok) {
+        toast(data.error === 'forbidden' ? 'ليس لديك صلاحية التوليد.' : 'تعذّر التوليد.', 'err');
+        return;
+      }
+      state.lastBatch = data;
+      $('batchEmpty').classList.add('hidden');
+      $('batchOut').classList.remove('hidden');
+      $('batchId').textContent = data.batchId;
+      $('batchCount').textContent = String((data.codes || []).length);
+      $('batchMax').textContent = data.useTypedDeviceLimits
+        ? ('💻 ' + data.maxDesktopDevices + ' + 📱 ' + data.maxAndroidDevices + ' = ' + data.maxDevices)
+        : String(data.maxDevices);
+      const distLine = $('batchDistCloudLine');
+      if (distLine) {
+        if (data.includeDistributorCloud) {
+          distLine.classList.remove('hidden');
+          $('batchDistCloud').textContent = (data.distributorCloudDays || 365) + ' يوم'
+            + (data.maxDistributorSeats != null ? (' — ' + data.maxDistributorSeats + ' مقعد') : '');
+        } else {
+          distLine.classList.add('hidden');
+        }
+      }
+      $('batchCodes').textContent = (data.codes || []).join('\n');
+      $('genNote').value = '';
+      if ($('genIncludeDistCloud')) $('genIncludeDistCloud').checked = false;
+      syncGenDistCloudPanel();
+      switchPanel('list', { reloadList: true });
+      toast('تم توليد ' + data.count + ' قسيمة', 'ok');
+    } catch (_e) {
+      toast('تعذّر الاتصال بالخادم.', 'err');
+    } finally {
+      setBusy(btn, false);
+    }
+  }
+
+  function copyBatch() {
+    if (!state.lastBatch) return;
+    const text = (state.lastBatch.codes || []).join('\n');
+    navigator.clipboard.writeText(text).then(
+      () => toast('تم نسخ القسائم', 'ok'),
+      () => toast('تعذّر النسخ', 'err'),
+    );
+  }
+  function downloadBatchCsv() {
+    if (!state.lastBatch) return;
+    window.location.href = apiUrl('/admin/vouchers/export?batchId=' + encodeURIComponent(state.lastBatch.batchId));
+  }
+  function printBatch() {
+    if (!state.lastBatch) return;
+    const html = '<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8">'
+      + '<title>قسائم MizaPos</title>'
+      + '<style>body{font-family:Tahoma,Arial,sans-serif;padding:20px}h1{font-size:14pt}'
+      + '.code{font-family:Consolas,monospace;font-size:14pt;letter-spacing:2px;border:1px solid #94a3b8;'
+      + 'padding:10px 16px;border-radius:8px;margin:6px 0;display:inline-block;min-width:280px}'
+      + '@media print{.nopr{display:none}}</style></head><body>'
+      + '<h1>قسائم تفعيل MizaPos</h1>'
+      + '<div>دفعة: ' + safe(state.lastBatch.batchId) + ' — العدد: ' + state.lastBatch.codes.length
+      + ' — أجهزة/قسيمة: ' + state.lastBatch.maxDevices + '</div>'
+      + state.lastBatch.codes.map((c) => '<div class="code">' + safe(c) + '</div>').join('')
+      + '<button class="nopr" onclick="window.print()" style="margin-top:18px;padding:10px 18px">طباعة</button>'
+      + '</body></html>';
+    const w = window.open('', '_blank');
+    if (!w) { toast('فعّل النوافذ المنبثقة.', 'warn'); return; }
+    w.document.open(); w.document.write(html); w.document.close();
+    setTimeout(() => w.print(), 400);
+  }
+
+  async function reloadList(resetPage) {
+    if (resetPage) state.page = 1;
+    const params = new URLSearchParams();
+    const search = ($('filterSearch') && $('filterSearch').value.trim()) || '';
+    const status = ($('filterStatus') && $('filterStatus').value.trim()) || '';
+    if (search) params.set('search', search);
+    if (status) params.set('status', status);
+    const size = Math.max(1, Math.min(500, parseInt(state.pageSize, 10) || 50));
+    state.pageSize = size;
+    params.set('limit', String(size));
+    params.set('offset', String((state.page - 1) * size));
+    const btn = $('btnReload');
+    setBusy(btn, true);
+    try {
+      const res = await fetch(apiUrl('/admin/vouchers/list?' + params.toString()), { headers: authHeaders() });
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 401) { logout(); return; }
+      if (!res.ok || !data.ok) { toast('تعذّر تحميل القائمة.', 'err'); return; }
+      state.list = data.items || [];
+      state.stats = data.stats || state.stats;
+      state.totalFiltered = data.total != null ? Number(data.total) : state.list.length;
+      $('statTotal').textContent = String(state.stats.total);
+      $('statUnused').textContent = String(state.stats.unused);
+      $('statRedeemed').textContent = String(state.stats.redeemed);
+      $('statRevoked').textContent = String(state.stats.revoked);
+      renderList();
+      renderPager();
+    } catch (_e) {
+      toast('تعذّر الاتصال بالخادم.', 'err');
+    } finally {
+      setBusy(btn, false);
+    }
+  }
+
+  function renderPager() {
+    const totalPages = Math.max(1, Math.ceil(state.totalFiltered / state.pageSize));
+    if (state.page > totalPages) state.page = totalPages;
+    const from = state.totalFiltered === 0 ? 0 : (state.page - 1) * state.pageSize + 1;
+    const to = Math.min(state.totalFiltered, state.page * state.pageSize);
+    const info = $('pagerInfo');
+    if (info) info.textContent = `يعرض ${from}–${to} من ${state.totalFiltered}`;
+    const pageEl = $('pagerPage');
+    if (pageEl) pageEl.textContent = `${state.page} / ${totalPages}`;
+    const canPrev = state.page > 1;
+    const canNext = state.page < totalPages;
+    ['btnFirst', 'btnPrev'].forEach((id) => { const b = $(id); if (b) b.disabled = !canPrev; });
+    ['btnLast', 'btnNext'].forEach((id) => { const b = $(id); if (b) b.disabled = !canNext; });
+  }
+
+  function gotoPage(p) {
+    const totalPages = Math.max(1, Math.ceil(state.totalFiltered / state.pageSize));
+    const next = Math.max(1, Math.min(totalPages, p | 0));
+    if (next === state.page) return;
+    state.page = next;
+    reloadList(false);
+  }
+
+  function renderList() {
+    const tb = $('vouchersTbody');
+    if (!tb) return;
+    if (state.list.length === 0) {
+      tb.innerHTML = '<tr><td colspan="7" class="empty-row">— لا توجد قسائم —</td></tr>';
+      return;
+    }
+    tb.innerHTML = state.list.map((v) => {
+      const email = v.redeemedByEmail || '';
+      const subscriberCell = email
+        ? countryChipHtml(v.subscriberDialCode || '', email, { flagWidth: 24, flagClass: 'flag-mini' })
+        : '—';
+      return ''
+      + '<tr>'
+      + '<td class="mono" style="font-weight:700">' + safe(v.code) + '</td>'
+      + '<td>' + statusPill(v.status) + '</td>'
+      + '<td>' + devicesCell(v) + '</td>'
+      + '<td style="max-width:240px">' + subscriberCell + '</td>'
+      + '<td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + safe(v.note || '') + '">' + safe(v.note || '—') + '</td>'
+      + '<td style="font-size:12px;color:#64748b">' + safe(fmtDate(v.createdAt)) + '</td>'
+      + '<td><div class="row" style="flex-wrap:nowrap">'
+      + '<button class="btn btn-sm" data-act="copy" data-code="' + safe(v.code) + '" title="نسخ">📋</button>'
+      + '<button class="btn btn-sm btn-primary" data-act="detail" data-code="' + safe(v.code) + '">تفاصيل</button>'
+      + '</div></td>'
+      + '</tr>';
+    }).join('');
+    tb.querySelectorAll('button[data-act]').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        const t = e.currentTarget;
+        const act = t.getAttribute('data-act');
+        const code = t.getAttribute('data-code') || '';
+        if (act === 'copy') {
+          navigator.clipboard.writeText(code).then(
+            () => toast('تم نسخ الكود', 'ok'),
+            () => toast('تعذّر النسخ', 'err'),
+          );
+        } else if (act === 'detail') {
+          openDetail(code);
+        }
+      });
+    });
+  }
+
+  function exportAll() {
+    const status = ($('filterStatus').value || '').trim();
+    window.location.href = apiUrl('/admin/vouchers/export' + (status ? '?status=' + encodeURIComponent(status) : ''));
+  }
+
+  async function loadSignupStats() {
+    try {
+      const res = await fetch(apiUrl('/admin/signups/stats'), { headers: authHeaders() });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) return;
+      state.registrations.stats = {
+        total: Number(data.total) || 0,
+        approved: Number(data.approved) || 0,
+        pending: Number(data.pending) || 0,
+        rejected: Number(data.rejected) || 0,
+      };
+      const badge = $('regCountBadge');
+      if (badge) badge.textContent = String(state.registrations.stats.total);
+    } catch (_e) { /* ignore */ }
+  }
+
+  function openRegistrations() {
+    switchPanel('registered');
+  }
+
+  async function reloadRegistrations(resetPage) {
+    const reg = state.registrations;
+    if (resetPage) reg.page = 1;
+    const search = ($('regFilterSearch') && $('regFilterSearch').value.trim()) || '';
+    const status = ($('regFilterStatus') && $('regFilterStatus').value.trim()) || 'all';
+    const size = Math.max(1, Math.min(500, parseInt(reg.pageSize, 10) || 50));
+    reg.pageSize = size;
+    const params = new URLSearchParams();
+    if (search) params.set('q', search);
+    if (status && status !== 'all') params.set('status', status);
+    params.set('limit', String(size));
+    params.set('offset', String((reg.page - 1) * size));
+    const btn = $('btnRegReload');
+    setBusy(btn, true);
+    try {
+      const res = await fetch(apiUrl('/admin/signups/archive?' + params.toString()), { headers: authHeaders() });
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 401) { toast('الجلسة منتهية. سجّل دخولك مجدداً.', 'err'); logout(); return; }
+      if (!res.ok || data.ok === false) {
+        const hint = (data && data.error) ? ' (' + data.error + ')' : (' HTTP ' + res.status);
+        toast('تعذّر تحميل قائمة المسجّلين' + hint + '.', 'err');
+        return;
+      }
+      reg.list = data.items || [];
+      reg.total = data.total != null ? Number(data.total) : reg.list.length;
+      renderRegistrations();
+      renderRegPager();
+    } catch (_e) {
+      toast('تعذّر الاتصال بالخادم.', 'err');
+    } finally {
+      setBusy(btn, false);
+    }
+  }
+
+  function renderRegPager() {
+    const reg = state.registrations;
+    const totalPages = Math.max(1, Math.ceil(reg.total / reg.pageSize));
+    if (reg.page > totalPages) reg.page = totalPages;
+    const from = reg.total === 0 ? 0 : (reg.page - 1) * reg.pageSize + 1;
+    const to = Math.min(reg.total, reg.page * reg.pageSize);
+    const info = $('regPagerInfo');
+    if (info) info.textContent = `يعرض ${from}–${to} من ${reg.total}`;
+    const pageEl = $('regPagerPage');
+    if (pageEl) pageEl.textContent = `${reg.page} / ${totalPages}`;
+    const canPrev = reg.page > 1;
+    const canNext = reg.page < totalPages;
+    ['btnRegFirst', 'btnRegPrev'].forEach((id) => { const b = $(id); if (b) b.disabled = !canPrev; });
+    ['btnRegLast', 'btnRegNext'].forEach((id) => { const b = $(id); if (b) b.disabled = !canNext; });
+  }
+
+  function gotoRegPage(p) {
+    const reg = state.registrations;
+    const totalPages = Math.max(1, Math.ceil(reg.total / reg.pageSize));
+    const next = Math.max(1, Math.min(totalPages, p | 0));
+    if (next === reg.page) return;
+    reg.page = next;
+    reloadRegistrations(false);
+  }
+
+  function renderRegistrations() {
+    const tb = $('regTbody');
+    if (!tb) return;
+    const list = state.registrations.list;
+    if (list.length === 0) {
+      tb.innerHTML = '<tr><td colspan="6" class="empty-row">— لا يوجد مسجّلون مطابقون —</td></tr>';
+      return;
+    }
+    tb.innerHTML = list.map((r) => {
+      const dial = r.dial_code || '';
+      const countryCell = dial
+        ? countryChipHtml(dial, null, { flagWidth: 20, flagClass: 'flag-mini' })
+        : '—';
+      const rid = safe(r.id || '');
+      return ''
+        + '<tr>'
+        + '<td style="font-weight:700">' + safe(r.full_name || '—') + '</td>'
+        + '<td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + safe(r.email || '') + '">' + safe(r.email || '—') + '</td>'
+        + '<td>' + emailVerifiedPill(r.email_verified) + '</td>'
+        + '<td style="max-width:140px">' + countryCell + '</td>'
+        + '<td style="white-space:nowrap">' + voucherLinkPill(r) + '</td>'
+        + '<td class="col-actions"><button class="btn btn-sm btn-primary" data-reg-edit="' + rid + '">تعديل</button></td>'
+        + '</tr>';
+    }).join('');
+    tb.querySelectorAll('button[data-reg-edit]').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        const id = e.currentTarget.getAttribute('data-reg-edit') || '';
+        const row = state.registrations.list.find((x) => x.id === id);
+        if (row) openRegEdit(row);
+      });
+    });
+  }
+
+  function openRegEdit(row) {
+    state.registrations.selected = row;
+    const dial = normalizeDial(row.dial_code || '');
+    const cinfo = countryFromDial(dial);
+    $('regEditName').textContent = row.full_name || '—';
+    $('regEditEmailDisplay').textContent = row.email || '—';
+    $('regEditEmailVerified').innerHTML = emailVerifiedPill(row.email_verified);
+    $('regEditCountry').innerHTML = cinfo && dial
+      ? countryChipHtml(dial, cinfo.name, { flagWidth: 20, flagClass: 'flag-mini' })
+      : '—';
+    const phone = row.phone ? (dial ? (dial + ' ' + row.phone) : row.phone).trim() : '—';
+    $('regEditPhone').textContent = phone;
+    $('regEditStatus').innerHTML = signupStatusPill(row.status);
+    $('regEditRequestedAt').textContent = fmtDate(row.requested_at);
+    $('regEditOrg').textContent = row.organization_id || '—';
+    $('regEditSubscription').textContent = subscriptionHint(row);
+    $('regEditVoucher').textContent = voucherLinkText(row);
+    renderRegSubscriptionPanel(row);
+    $('regEditEmail').value = row.email || '';
+    $('regEditPassword').value = '';
+    $('regEditModalBack').classList.add('open');
+    loadRegVoucherActivity(row);
+  }
+
+  function closeRegEdit() {
+    $('regEditModalBack').classList.remove('open');
+    state.registrations.selected = null;
+    const wrap = $('regVoucherLogWrap');
+    if (wrap) wrap.classList.add('hidden');
+  }
+
+  function regApiError(data, status, fallback) {
+    if (status === 403 || (data && data.error === 'forbidden')) return 'ليس لديك صلاحية لهذه العملية.';
+    if (data && data.error === 'validation') return 'بيانات غير صالحة.';
+    if (data && data.error === 'not_found') return 'المستخدم غير موجود.';
+    return fallback || 'تعذّر تنفيذ العملية.';
+  }
+
+  async function saveRegEmail() {
+    const sel = state.registrations.selected;
+    if (!sel) return;
+    const newEmail = ($('regEditEmail').value || '').trim().toLowerCase();
+    const cur = (sel.email || '').trim().toLowerCase();
+    if (!newEmail || !newEmail.includes('@')) {
+      toast('أدخل بريداً صالحاً.', 'err');
+      return;
+    }
+    if (newEmail === cur) {
+      toast('البريد لم يتغيّر.', 'warn');
+      return;
+    }
+    const btn = $('regSaveEmail');
+    setBusy(btn, true);
+    try {
+      const res = await fetch(apiUrl('/admin/subscribers/change-email'), {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({
+          organizationId: sel.organization_id,
+          currentEmail: cur,
+          newEmail,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 401) { logout(); return; }
+      if (!res.ok || !data.ok) {
+        toast(regApiError(data, res.status, 'فشل تحديث البريد.'), 'err');
+        return;
+      }
+      toast('تم تحديث البريد', 'ok');
+      closeRegEdit();
+      await reloadRegistrations(false);
+      await loadSignupStats();
+    } catch (_e) {
+      toast('تعذّر الاتصال بالخادم.', 'err');
+    } finally {
+      setBusy(btn, false);
+    }
+  }
+
+  async function saveRegPassword() {
+    const sel = state.registrations.selected;
+    if (!sel) return;
+    const pwd = $('regEditPassword').value || '';
+    if (pwd.length < 8) {
+      toast('كلمة المرور يجب أن تكون 8 أحرف على الأقل.', 'err');
+      return;
+    }
+    const btn = $('regSavePassword');
+    setBusy(btn, true);
+    try {
+      const res = await fetch(apiUrl('/admin/subscribers/password'), {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({
+          organizationId: sel.organization_id,
+          email: (sel.email || '').trim().toLowerCase(),
+          newPassword: pwd,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 401) { logout(); return; }
+      if (!res.ok || !data.ok) {
+        toast(regApiError(data, res.status, 'فشل تعيين كلمة المرور.'), 'err');
+        return;
+      }
+      toast('تم تعيين كلمة المرور', 'ok');
+      $('regEditPassword').value = '';
+    } catch (_e) {
+      toast('تعذّر الاتصال بالخادم.', 'err');
+    } finally {
+      setBusy(btn, false);
+    }
+  }
+
+  async function renewRegSubscription() {
+    if (!state.registrations.selected) return;
+    if (!window.confirm('تجديد الاشتراك السنوي (+365 يوم من اليوم أو من تاريخ الانتهاء الحالي)؟')) return;
+    const btn = $('regRenewSub');
+    setBusy(btn, true);
+    try {
+      const data = await applyRegLicense('renew_subscription', { days: 365 });
+      if (!data) return;
+      toast('تم تجديد الاشتراك السنوي', 'ok');
+      await refreshRegEditAfterLicense();
+    } finally {
+      setBusy(btn, false);
+    }
+  }
+
+  async function extendRegSubscription() {
+    if (!state.registrations.selected) return;
+    const days = Math.max(1, Math.min(3660, parseInt($('regExtendDays').value, 10) || 0));
+    if (days < 1) {
+      toast('أدخل عدد أيام صالحاً.', 'err');
+      return;
+    }
+    const btn = $('regExtendSub');
+    setBusy(btn, true);
+    try {
+      const data = await applyRegLicense('extend_subscription', { days });
+      if (!data) return;
+      toast('تم تمديد الاشتراك ' + days + ' يوماً', 'ok');
+      await refreshRegEditAfterLicense();
+    } finally {
+      setBusy(btn, false);
+    }
+  }
+
+  async function setRegSubscriptionUntil() {
+    if (!state.registrations.selected) return;
+    const raw = ($('regSetUntil').value || '').trim();
+    if (!raw) {
+      toast('اختر تاريخ انتهاء.', 'err');
+      return;
+    }
+    const btn = $('regSetUntilBtn');
+    setBusy(btn, true);
+    try {
+      const data = await applyRegLicense('set_subscription_until', { until: raw });
+      if (!data) return;
+      toast('تم تعيين تاريخ الانتهاء', 'ok');
+      await refreshRegEditAfterLicense();
+    } finally {
+      setBusy(btn, false);
+    }
+  }
+
+  async function freezeRegSubscription() {
+    if (!state.registrations.selected) return;
+    if (!window.confirm('إيقاف وصول هذا المشترك (تعليق الاشتراك)؟')) return;
+    const btn = $('regFreezeSub');
+    setBusy(btn, true);
+    try {
+      const data = await applyRegLicense('freeze');
+      if (!data) return;
+      toast('تم إيقاف الاشتراك', 'ok');
+      await refreshRegEditAfterLicense();
+    } finally {
+      setBusy(btn, false);
+    }
+  }
+
+  async function unfreezeRegSubscription() {
+    if (!state.registrations.selected) return;
+    const btn = $('regUnfreezeSub');
+    setBusy(btn, true);
+    try {
+      const data = await applyRegLicense('unfreeze');
+      if (!data) return;
+      toast('تم إعادة تفعيل الوصول', 'ok');
+      await refreshRegEditAfterLicense();
+    } finally {
+      setBusy(btn, false);
+    }
+  }
+
+  async function deleteRegUser() {
+    const sel = state.registrations.selected;
+    if (!sel) return;
+    const email = (sel.email || '').trim();
+    const msg = 'حذف المستخدم «' + email + '» نهائياً من الخادم؟\n'
+      + 'سيُزال حساب التسجيل وسجل الترخيص المرتبط.';
+    if (!window.confirm(msg)) return;
+    const typed = window.prompt('للتأكيد اكتب: حذف');
+    if ((typed || '').trim() !== 'حذف' && (typed || '').trim().toLowerCase() !== 'delete') {
+      toast('أُلغي الحذف.', 'warn');
+      return;
+    }
+    const btn = $('regDeleteUser');
+    setBusy(btn, true);
+    try {
+      const res = await fetch(apiUrl('/admin/licenses/apply'), {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({
+          organizationId: sel.organization_id,
+          email: email.toLowerCase(),
+          action: 'delete_snapshot',
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 401) { logout(); return; }
+      if (!res.ok || !data.ok) {
+        toast(regApiError(data, res.status, 'فشل حذف المستخدم.'), 'err');
+        return;
+      }
+      toast('تم حذف المستخدم', 'ok');
+      closeRegEdit();
+      await reloadRegistrations(false);
+      await loadSignupStats();
+    } catch (_e) {
+      toast('تعذّر الاتصال بالخادم.', 'err');
+    } finally {
+      setBusy(btn, false);
+    }
+  }
+
+  async function exportRegistrationsCsv() {
+    const search = ($('regFilterSearch') && $('regFilterSearch').value.trim()) || '';
+    const status = ($('regFilterStatus') && $('regFilterStatus').value.trim()) || 'all';
+    const params = new URLSearchParams();
+    if (search) params.set('q', search);
+    if (status && status !== 'all') params.set('status', status);
+    const btn = $('btnRegExport');
+    setBusy(btn, true);
+    try {
+      const res = await fetch(apiUrl('/admin/signups/export?' + params.toString()), { headers: authHeaders() });
+      if (res.status === 401) { toast('الجلسة منتهية. سجّل دخولك مجدداً.', 'err'); logout(); return; }
+      if (!res.ok) { toast('تعذّر تصدير القائمة.', 'err'); return; }
+      const blob = await res.blob();
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'mizapos-registered-' + new Date().toISOString().slice(0, 10) + '.csv';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(a.href);
+      toast('تم تنزيل CSV لكل المسجّلين المطابقين', 'ok');
+    } catch (_e) {
+      toast('تعذّر الاتصال بالخادم.', 'err');
+    } finally {
+      setBusy(btn, false);
+    }
+  }
+
+  async function openDetail(code) {
+    const params = new URLSearchParams({ code });
+    try {
+      const res = await fetch(apiUrl('/admin/vouchers/detail?' + params.toString()), { headers: authHeaders() });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) { toast('تعذّر تحميل التفاصيل.', 'err'); return; }
+      state.selected = data.voucher;
+      const v = data.voucher;
+      const sub = data.subscriber || null;
+      $('mCode').textContent = v.code;
+      $('mStatus').innerHTML = statusPill(v.status);
+      $('mName').textContent = (sub && sub.fullName) ? sub.fullName : '—';
+      $('mEmail').textContent = v.redeemedByEmail || '—';
+      const phone = sub && sub.phone ? sub.phone : '';
+      const dial = normalizeDial(sub && sub.dialCode ? sub.dialCode : '');
+      $('mPhone').textContent = phone ? (dial ? `${dial} ${phone}` : phone) : '—';
+
+      const cinfo = countryFromDial(dial);
+      const banner = $('mCountryBanner');
+      const flagImg = $('mCountryFlag');
+      const nameEl = $('mCountryName');
+      const dialEl = $('mCountryDial');
+      const countryCell = $('mCountry');
+      if (cinfo && dial) {
+        if (banner) {
+          banner.hidden = false;
+          banner.classList.toggle('empty', !cinfo.iso);
+          if (flagImg) {
+            if (cinfo.iso) {
+              flagImg.hidden = false;
+              flagImg.referrerPolicy = 'no-referrer';
+              flagImg.src = flagSrc(cinfo.iso, 80);
+              flagImg.srcset = flagSrcSet(cinfo.iso, 80);
+              flagImg.alt = cinfo.name;
+              flagImg.title = cinfo.name + ' ' + cinfo.dial;
+            } else {
+              flagImg.hidden = true;
+              flagImg.removeAttribute('src');
+            }
+          }
+          if (nameEl) nameEl.textContent = cinfo.name;
+          if (dialEl) dialEl.textContent = cinfo.dial;
+        }
+        if (countryCell) {
+          countryCell.innerHTML =
+            (cinfo.iso ? flagImgHtml(cinfo.iso, { className: 'flag-inline', width: 40, alt: cinfo.name, title: cinfo.name }) : '')
+            + safe(cinfo.name + ' (' + cinfo.dial + ')');
+        }
+      } else {
+        if (banner) banner.hidden = true;
+        if (countryCell) countryCell.textContent = '—';
+      }
+      $('mOrg').textContent = v.redeemedByOrganizationId || '—';
+      $('mDev').textContent = v.useTypedDeviceLimits
+        ? ('إجمالي ' + v.usedDevices + ' / ' + v.maxDevices)
+        : (v.usedDevices + ' / ' + v.maxDevices);
+      $('mTypedLimitsBox') && $('mTypedLimitsBox').classList.toggle('hidden', !v.useTypedDeviceLimits);
+      if ($('mDevDesktop')) {
+        $('mDevDesktop').textContent = (v.usedDesktopDevices != null ? v.usedDesktopDevices : 0)
+          + ' / ' + (v.maxDesktopDevices != null ? v.maxDesktopDevices : 0);
+      }
+      if ($('mDevAndroid')) {
+        $('mDevAndroid').textContent = (v.usedAndroidDevices != null ? v.usedAndroidDevices : 0)
+          + ' / ' + (v.maxAndroidDevices != null ? v.maxAndroidDevices : 0);
+      }
+      $('mMaxDevices').value = String(v.maxDevices);
+      $('mMaxDevices').min = String(Math.max(1, v.usedDevices || 1));
+      if ($('mUseTyped')) {
+        $('mUseTyped').checked = !!v.useTypedDeviceLimits;
+        syncModalTypedPanel();
+      }
+      if ($('mMaxDesktop')) $('mMaxDesktop').value = String(v.maxDesktopDevices != null ? v.maxDesktopDevices : 0);
+      if ($('mMaxAndroid')) $('mMaxAndroid').value = String(v.maxAndroidDevices != null ? v.maxAndroidDevices : 0);
+      const dst = data.deviceStats || {};
+      const statsEl = $('mDeviceStats');
+      if (statsEl) {
+        let txt = 'أجهزة نشطة (بدون تكرار): ' + (dst.activeDevices != null ? dst.activeDevices : v.usedDevices)
+          + ' — سجلات إجمالية: ' + (dst.totalRows != null ? dst.totalRows : (data.devices || []).length);
+        if ((dst.dedupedRows | 0) > 0) {
+          txt += ' — صُحّح ' + dst.dedupedRows + ' تكرار لنفس الجهاز';
+        }
+        statsEl.textContent = txt;
+      }
+      $('mCreated').textContent = fmtDate(v.createdAt);
+      $('mRedeemed').textContent = fmtDate(v.firstRedeemedAt);
+      $('mReason').textContent = v.revokeReason || '—';
+      renderVoucherDistributorCloud(v);
+      $('mNote').value = v.note || '';
+      $('mRestore').classList.toggle('hidden', v.status !== 'revoked');
+      $('mRevoke').classList.toggle('hidden', v.status === 'revoked');
+      const dt = $('mDevices');
+      if (!data.devices.length) {
+        dt.innerHTML = '<tr><td colspan="7" class="empty-row">لم تُربط بأي جهاز.</td></tr>';
+      } else {
+        dt.innerHTML = data.devices.map((d) => {
+          const active = !d.revoked_at;
+          const plat = platformLabel(d.device_platform, d.os_name);
+          return ''
+          + '<tr>'
+          + '<td>' + safe(d.computer_name || '—') + '<div style="color:#64748b;font-size:11px">' + safe(d.os_name || '') + '</div></td>'
+          + '<td><span class="platform-pill ' + plat.cls + '">' + plat.icon + ' ' + plat.label + '</span></td>'
+          + '<td class="mono" style="font-size:11px" title="' + safe(d.installation_id || '') + '">' + safe((d.installation_id || '').slice(0, 18)) + '…</td>'
+          + '<td style="font-size:12px">' + safe(fmtDate(d.redeemed_at)) + '</td>'
+          + '<td style="font-size:12px">' + safe(fmtDate(d.last_seen_at)) + '</td>'
+          + '<td>' + deviceEntryStatusPill(active) + '</td>'
+          + '<td>' + (active ? '<button class="btn btn-sm btn-danger" data-rev="' + safe(d.installation_id) + '">إلغاء</button>' : '') + '</td>'
+          + '</tr>';
+        }).join('');
+        dt.querySelectorAll('button[data-rev]').forEach((btn) => {
+          btn.addEventListener('click', async (e) => {
+            const installationId = e.currentTarget.getAttribute('data-rev') || '';
+            if (!window.confirm('إلغاء تفعيل هذا الجهاز فقط؟')) return;
+            const r = await fetch(apiUrl('/admin/vouchers/revoke-device'), {
+              method: 'POST',
+              headers: authHeaders(),
+              body: JSON.stringify({ code: v.code, installationId }),
+            });
+            if (!r.ok) { toast('فشل إلغاء الجهاز.', 'err'); return; }
+            toast('تم إلغاء الجهاز', 'ok');
+            openDetail(v.code);
+          });
+        });
+      }
+      $('modalBack').classList.add('open');
+    } catch (_e) {
+      toast('تعذّر الاتصال بالخادم.', 'err');
+    }
+  }
+
+  function closeDetail() { $('modalBack').classList.remove('open'); state.selected = null; }
+
+  async function saveNote() {
+    if (!state.selected) return;
+    const note = ($('mNote').value || '').trim();
+    const r = await fetch(apiUrl('/admin/vouchers/update-note'), {
+      method: 'POST', headers: authHeaders(),
+      body: JSON.stringify({ code: state.selected.code, note }),
+    });
+    if (!r.ok) { toast('فشل حفظ الملاحظة.', 'err'); return; }
+    toast('تم حفظ الملاحظة', 'ok');
+    await reloadList();
+  }
+
+  async function revokeVoucher() {
+    if (!state.selected) return;
+    if (!window.confirm('سيُلغى الاشتراك ويتحول البرنامج لقراءة-فقط. متابعة؟')) return;
+    const reason = window.prompt('سبب الإلغاء (اختياري):') || '';
+    const r = await fetch(apiUrl('/admin/vouchers/revoke'), {
+      method: 'POST', headers: authHeaders(),
+      body: JSON.stringify({ code: state.selected.code, reason }),
+    });
+    if (!r.ok) { toast('فشل إلغاء القسيمة.', 'err'); return; }
+    toast('تم إلغاء القسيمة', 'ok');
+    await openDetail(state.selected.code);
+    await reloadList();
+  }
+
+  async function restoreVoucher() {
+    if (!state.selected) return;
+    const r = await fetch(apiUrl('/admin/vouchers/restore'), {
+      method: 'POST', headers: authHeaders(),
+      body: JSON.stringify({ code: state.selected.code }),
+    });
+    if (!r.ok) { toast('فشل الاستعادة.', 'err'); return; }
+    toast('تم استعادة القسيمة', 'ok');
+    await openDetail(state.selected.code);
+    await reloadList();
+  }
+
+  async function saveMaxDevices() {
+    if (!state.selected) return;
+    const useTyped = $('mUseTyped') && $('mUseTyped').checked;
+    const v = parseInt($('mMaxDevices').value, 10) || 0;
+    if (!useTyped && (v < 1 || v > 99)) { toast('قيمة غير صالحة (1–99).', 'err'); return; }
+    const btn = $('mSaveMaxDevices');
+    setBusy(btn, true);
+    try {
+      const payload = useTyped
+        ? {
+            code: state.selected.code,
+            useTypedDeviceLimits: true,
+            maxDesktopDevices: parseInt($('mMaxDesktop').value, 10) || 0,
+            maxAndroidDevices: parseInt($('mMaxAndroid').value, 10) || 0,
+          }
+        : { code: state.selected.code, maxDevices: v };
+      const r = await fetch(apiUrl('/admin/vouchers/update-max-devices'), {
+        method: 'POST', headers: authHeaders(),
+        body: JSON.stringify(payload),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (r.status === 409 && data && data.error === 'used_exceeds_limit') {
+        if (data.usedDesktopDevices != null) {
+          toast('لا يمكن التقليل تحت الأجهزة المُفعَّلة (💻 ' + data.usedDesktopDevices + ' · 📱 ' + data.usedAndroidDevices + ').', 'err');
+        } else {
+          toast('لا يمكن التقليل تحت عدد الأجهزة المُفعَّلة (' + data.usedDevices + ').', 'err');
+        }
+        return;
+      }
+      if (!r.ok || !data.ok) { toast('فشل تحديث عدد الأجهزة.', 'err'); return; }
+      toast('تم حفظ عدد الأجهزة', 'ok');
+      await openDetail(state.selected.code);
+      await reloadList();
+    } catch (_e) {
+      toast('تعذّر الاتصال بالخادم.', 'err');
+    } finally {
+      setBusy(btn, false);
+    }
+  }
+
+  async function saveTypedLimitsOnly() {
+    if (!state.selected) return;
+    if ($('mUseTyped')) $('mUseTyped').checked = true;
+    syncModalTypedPanel();
+    await saveMaxDevices();
+  }
+
+  async function deleteVoucher() {
+    if (!state.selected) return;
+    const code = state.selected.code;
+    const confirmMsg = 'سيُحذف الاشتراك (' + code + ') نهائياً من قاعدة البيانات\n'
+      + 'مع كل الأجهزة المرتبطة به، ولن يمكن استرجاعه.\n\n'
+      + 'هل أنت متأكد من المتابعة؟';
+    if (!window.confirm(confirmMsg)) return;
+    const typed = window.prompt('للتأكيد اكتب: حذف');
+    if ((typed || '').trim() !== 'حذف' && (typed || '').trim().toLowerCase() !== 'delete') {
+      toast('أُلغي الحذف.', 'warn');
+      return;
+    }
+    const btn = $('mDelete');
+    setBusy(btn, true);
+    try {
+      const r = await fetch(apiUrl('/admin/vouchers/delete'), {
+        method: 'POST', headers: authHeaders(),
+        body: JSON.stringify({ code }),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (r.status === 403) { toast('ليس لديك صلاحية الحذف.', 'err'); return; }
+      if (!r.ok || !data.ok) { toast('فشل حذف القسيمة.', 'err'); return; }
+      toast('تم حذف القسيمة نهائياً', 'ok');
+      closeDetail();
+      await reloadList();
+    } catch (_e) {
+      toast('تعذّر الاتصال بالخادم.', 'err');
+    } finally {
+      setBusy(btn, false);
+    }
+  }
+
+  function bind() {
+    $('loginForm') && $('loginForm').addEventListener('submit', login);
+    $('btnDiag') && $('btnDiag').addEventListener('click', runDiagnostics);
+    $('btnLogout') && $('btnLogout').addEventListener('click', logout);
+    $('genForm') && $('genForm').addEventListener('submit', generate);
+    $('genUseTyped') && $('genUseTyped').addEventListener('change', syncGenTypedPanel);
+    $('genIncludeDistCloud') && $('genIncludeDistCloud').addEventListener('change', syncGenDistCloudPanel);
+    syncGenDistCloudPanel();
+    ['genMaxDesktop', 'genMaxAndroid'].forEach((id) => {
+      const el = $(id);
+      if (el) el.addEventListener('input', syncGenTypedPanel);
+    });
+    syncGenTypedPanel();
+    $('mUseTyped') && $('mUseTyped').addEventListener('change', syncModalTypedPanel);
+    $('mSaveTypedLimits') && $('mSaveTypedLimits').addEventListener('click', (e) => {
+      e.preventDefault();
+      saveTypedLimitsOnly();
+    });
+    $('btnCopy') && $('btnCopy').addEventListener('click', copyBatch);
+    $('btnCsv') && $('btnCsv').addEventListener('click', downloadBatchCsv);
+    $('btnPrint') && $('btnPrint').addEventListener('click', printBatch);
+    $('btnReload') && $('btnReload').addEventListener('click', () => reloadList(true));
+    $('btnExportAll') && $('btnExportAll').addEventListener('click', exportAll);
+    document.querySelectorAll('.app-nav-btn[data-panel]').forEach((btn) => {
+      btn.addEventListener('click', () => switchPanel(btn.dataset.panel));
+    });
+    window.addEventListener('hashchange', () => {
+      if (!state.token) return;
+      const name = panelFromHash();
+      if (name !== state.currentPanel) {
+        switchPanel(name, { skipHash: true, reloadReg: name === 'registered' });
+      }
+    });
+    $('btnRegReload') && $('btnRegReload').addEventListener('click', () => reloadRegistrations(true));
+    $('btnRegExport') && $('btnRegExport').addEventListener('click', exportRegistrationsCsv);
+    $('regFilterSearch') && $('regFilterSearch').addEventListener('keydown', (e) => { if (e.key === 'Enter') reloadRegistrations(true); });
+    $('regFilterStatus') && $('regFilterStatus').addEventListener('change', () => reloadRegistrations(true));
+    $('regPageSize') && $('regPageSize').addEventListener('change', (e) => {
+      state.registrations.pageSize = parseInt(e.target.value, 10) || 50;
+      reloadRegistrations(true);
+    });
+    $('btnRegFirst') && $('btnRegFirst').addEventListener('click', () => gotoRegPage(1));
+    $('btnRegPrev') && $('btnRegPrev').addEventListener('click', () => gotoRegPage(state.registrations.page - 1));
+    $('btnRegNext') && $('btnRegNext').addEventListener('click', () => gotoRegPage(state.registrations.page + 1));
+    $('btnRegLast') && $('btnRegLast').addEventListener('click', () => {
+      const totalPages = Math.max(1, Math.ceil(state.registrations.total / state.registrations.pageSize));
+      gotoRegPage(totalPages);
+    });
+    $('regEditClose') && $('regEditClose').addEventListener('click', closeRegEdit);
+    $('regEditModalBack') && $('regEditModalBack').addEventListener('click', (e) => { if (e.target === $('regEditModalBack')) closeRegEdit(); });
+    $('regRenewSub') && $('regRenewSub').addEventListener('click', renewRegSubscription);
+    $('regExtendSub') && $('regExtendSub').addEventListener('click', extendRegSubscription);
+    $('regSetUntilBtn') && $('regSetUntilBtn').addEventListener('click', setRegSubscriptionUntil);
+    $('regFreezeSub') && $('regFreezeSub').addEventListener('click', freezeRegSubscription);
+    $('regUnfreezeSub') && $('regUnfreezeSub').addEventListener('click', unfreezeRegSubscription);
+    $('mDistExtendBtn') && $('mDistExtendBtn').addEventListener('click', () => extendVoucherDistributorCloud());
+    $('mDistSetSeatsBtn') && $('mDistSetSeatsBtn').addEventListener('click', () => setVoucherDistributorSeats());
+    $('mDistClearBtn') && $('mDistClearBtn').addEventListener('click', () => clearVoucherDistributorCloud());
+    $('mDistReactivateBtn') && $('mDistReactivateBtn').addEventListener('click', () => reactivateVoucherDistributorCloud());
+    $('regSaveEmail') && $('regSaveEmail').addEventListener('click', saveRegEmail);
+    $('regSavePassword') && $('regSavePassword').addEventListener('click', saveRegPassword);
+    $('regDeleteUser') && $('regDeleteUser').addEventListener('click', deleteRegUser);
+    $('mClose') && $('mClose').addEventListener('click', closeDetail);
+    $('mSaveNote') && $('mSaveNote').addEventListener('click', saveNote);
+    $('mSaveMaxDevices') && $('mSaveMaxDevices').addEventListener('click', saveMaxDevices);
+    $('mRevoke') && $('mRevoke').addEventListener('click', revokeVoucher);
+    $('mRestore') && $('mRestore').addEventListener('click', restoreVoucher);
+    $('mDelete') && $('mDelete').addEventListener('click', deleteVoucher);
+    $('filterSearch') && $('filterSearch').addEventListener('keydown', (e) => { if (e.key === 'Enter') reloadList(true); });
+    $('filterStatus') && $('filterStatus').addEventListener('change', () => reloadList(true));
+    $('pageSize') && $('pageSize').addEventListener('change', (e) => {
+      state.pageSize = parseInt(e.target.value, 10) || 50;
+      reloadList(true);
+    });
+    $('btnFirst') && $('btnFirst').addEventListener('click', () => gotoPage(1));
+    $('btnPrev') && $('btnPrev').addEventListener('click', () => gotoPage(state.page - 1));
+    $('btnNext') && $('btnNext').addEventListener('click', () => gotoPage(state.page + 1));
+    $('btnLast') && $('btnLast').addEventListener('click', () => {
+      const totalPages = Math.max(1, Math.ceil(state.totalFiltered / state.pageSize));
+      gotoPage(totalPages);
+    });
+    $('modalBack') && $('modalBack').addEventListener('click', (e) => { if (e.target === $('modalBack')) closeDetail(); });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && $('modalBack').classList.contains('open')) closeDetail();
+      if (e.key === 'Escape' && $('regEditModalBack').classList.contains('open')) closeRegEdit();
+    });
+  }
+
+  async function boot() {
+    bind();
+    // مزامنة قائمة حجم الصفحة مع الحالة قبل أول تحميل
+    const sz = $('pageSize');
+    if (sz) {
+      const v = parseInt(sz.value, 10) || 50;
+      state.pageSize = v;
+    }
+    if (state.token) {
+      showApp();
+    } else {
+      showLogin();
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot);
+  } else {
+    boot();
+  }
+})();
+</script>
+</body>
+</html>

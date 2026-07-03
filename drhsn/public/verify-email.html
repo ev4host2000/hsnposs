@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="activation-api-base" content="__ACTIVATION_BASE__" />
+  <link rel="canonical" href="https://mizapos.com/drhsn/public/verify-email.html" />
+  <title>MizaPos — تأكيد البريد الإلكتروني</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" />
+  <style>
+    :root {
+      --brand-1: #6366f1;
+      --brand-2: #8b5cf6;
+      --bg: #f4f5fb;
+      --surface: #ffffff;
+      --text: #0f172a;
+      --muted: #64748b;
+      --ok: #10b981;
+      --danger: #ef4444;
+      --shadow: 0 16px 40px rgba(15, 23, 42, 0.1);
+      --radius: 18px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: 'Cairo', 'Segoe UI', Tahoma, sans-serif;
+      background: linear-gradient(160deg, #eef2ff 0%, var(--bg) 45%, #fdf2f8 100%);
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .card {
+      width: min(480px, 100%);
+      background: var(--surface);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 28px 24px 24px;
+      text-align: center;
+    }
+    .logo {
+      font-weight: 900;
+      font-size: 1.35rem;
+      background: linear-gradient(135deg, var(--brand-1), var(--brand-2));
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      margin-bottom: 8px;
+    }
+    h1 {
+      margin: 0 0 10px;
+      font-size: 1.2rem;
+      font-weight: 800;
+    }
+    p {
+      margin: 0 0 14px;
+      line-height: 1.7;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+    .status {
+      margin: 18px 0 10px;
+      padding: 14px 16px;
+      border-radius: 12px;
+      font-weight: 700;
+      font-size: 0.95rem;
+    }
+    .status--loading { background: #eef2ff; color: #4338ca; }
+    .status--ok { background: #ecfdf5; color: #047857; }
+    .status--err { background: #fef2f2; color: #b91c1c; }
+    a.site {
+      display: inline-block;
+      margin-top: 8px;
+      color: var(--brand-1);
+      font-weight: 800;
+      text-decoration: none;
+    }
+    a.site:hover { text-decoration: underline; }
+    .spinner {
+      width: 28px;
+      height: 28px;
+      border: 3px solid #c7d2fe;
+      border-top-color: var(--brand-1);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 12px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">MizaPos</div>
+    <h1>تأكيد البريد الإلكتروني</h1>
+    <p id="intro">جارٍ التحقق من رابط التأكيد…</p>
+    <div id="panel">
+      <div class="spinner" aria-hidden="true"></div>
+      <div class="status status--loading" id="status">يرجى الانتظار</div>
+    </div>
+    <p>الموقع الرسمي: <a class="site" href="https://mizapos.com">https://mizapos.com</a></p>
+  </div>
+  <script>
+(function () {
+  function apiRoot() {
+    const m = document.querySelector('meta[name="activation-api-base"]');
+    const v = String((m && m.getAttribute('content')) || '').trim();
+    if (v && v !== '__ACTIVATION_BASE__') return v.replace(/\/$/, '');
+    const path = location.pathname;
+    if (path.includes('/public/')) return path.slice(0, path.indexOf('/public/'));
+    return path.replace(/\/(?:index\.php\/.*|[^/]+\.html?)$/i, '') || '';
+  }
+  const apiUrl = (p) => apiRoot() + (p.startsWith('/') ? p : '/' + p);
+  const params = new URLSearchParams(location.search);
+  const token = (params.get('token') || '').trim();
+  const intro = document.getElementById('intro');
+  const status = document.getElementById('status');
+  const panel = document.getElementById('panel');
+
+  function show(ok, title, body) {
+    panel.innerHTML = '';
+    const box = document.createElement('div');
+    box.className = 'status ' + (ok ? 'status--ok' : 'status--err');
+    box.textContent = title;
+    panel.appendChild(box);
+    if (body) {
+      const p = document.createElement('p');
+      p.textContent = body;
+      panel.appendChild(p);
+    }
+  }
+
+  if (!token) {
+    intro.textContent = 'رابط التأكيد غير صالح.';
+    show(false, 'الرمز مفقود', 'افتح الرابط من رسالة الترحيب المرسلة إلى بريدك.');
+    return;
+  }
+
+  fetch(apiUrl('/api/verify-email?token=' + encodeURIComponent(token)), {
+    method: 'GET',
+    headers: { Accept: 'application/json' },
+  })
+    .then(async (res) => {
+      let data = {};
+      try { data = await res.json(); } catch (_) {}
+      if (res.ok && data.ok) {
+        intro.textContent = 'تم التأكيد بنجاح.';
+        const email = data.email ? (' (' + data.email + ')') : '';
+        show(true, 'شكراً! تم تأكيد بريدك' + email, 'يمكنك الآن العودة إلى تطبيق MizaPos وتسجيل الدخول.');
+        return;
+      }
+      intro.textContent = 'تعذّر تأكيد البريد.';
+      const err = data.error || ('http_' + res.status);
+      if (err === 'expired') {
+        show(false, 'انتهت صلاحية الرابط', 'من التطبيق اطلب «إعادة إرسال رسالة التأكيد» ثم افتح الرابط الجديد.');
+      } else if (err === 'invalid_token') {
+        show(false, 'الرابط غير صالح', 'تأكد أنك تستخدم أحدث رسالة ترحيب.');
+      } else {
+        show(false, 'فشل التأكيد', 'حاول لاحقاً أو اطلب إعادة إرسال الرسالة من التطبيق.');
+      }
+    })
+    .catch(() => {
+      intro.textContent = 'تعذّر الاتصال بالخادم.';
+      show(false, 'لا اتصال', 'تحقق من الإنترنت وحاول فتح الرابط مرة أخرى.');
+    });
+})();
+  </script>
+</body>
+</html>

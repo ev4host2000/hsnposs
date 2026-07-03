@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'package:mizapos_desktop/screens/shared/ui_style_tokens.dart';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -7,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:mizapos_desktop/config/remote_signup_config.dart';
 import 'package:mizapos_desktop/l10n/app_localizations.dart';
 import 'package:mizapos_desktop/services/database_service.dart';
+import 'package:mizapos_desktop/services/accounting_service.dart';
 import 'package:mizapos_desktop/services/voucher_api.dart';
 import 'package:mizapos_desktop/services/voucher_session_manager.dart';
 import 'package:mizapos_desktop/theme/app_design.dart';
@@ -27,12 +29,14 @@ import 'package:mizapos_desktop/ui/subscription_plan_card.dart';
 Future<VoucherStatus?> showVoucherActivationDialog(
   BuildContext context, {
   bool allowSubscriberManagement = true,
+  AccountingService? accountingService,
 }) {
   return showDialog<VoucherStatus>(
     context: context,
     barrierDismissible: true,
     builder: (_) => _VoucherActivationDialog(
       allowSubscriberManagement: allowSubscriberManagement,
+      accountingService: accountingService,
     ),
   );
 }
@@ -194,9 +198,13 @@ Future<String?> showSubscriberRegistrationWelcomeDialog(
 }
 
 class _VoucherActivationDialog extends StatefulWidget {
-  const _VoucherActivationDialog({required this.allowSubscriberManagement});
+  const _VoucherActivationDialog({
+    required this.allowSubscriberManagement,
+    this.accountingService,
+  });
 
   final bool allowSubscriberManagement;
+  final AccountingService? accountingService;
 
   @override
   State<_VoucherActivationDialog> createState() =>
@@ -331,6 +339,7 @@ class _VoucherActivationDialogState extends State<_VoucherActivationDialog> {
       return _SignInOrRegisterPanel(
         embedPlan: embedPlan,
         wide: wide,
+        accountingService: widget.accountingService,
         onDone: () => setState(() {}),
         onRegisterStarted: () {
           setState(() => _holdRedeemForWelcome = true);
@@ -526,6 +535,7 @@ class _SignInOrRegisterPanel extends StatefulWidget {
     required this.onRegisterStarted,
     required this.onRegisterFailed,
     required this.onRegisterSuccess,
+    this.accountingService,
     this.embedPlan = true,
     this.wide = false,
   });
@@ -533,6 +543,7 @@ class _SignInOrRegisterPanel extends StatefulWidget {
   final VoidCallback onRegisterStarted;
   final VoidCallback onRegisterFailed;
   final Future<void> Function(String fullName) onRegisterSuccess;
+  final AccountingService? accountingService;
   final bool embedPlan;
   final bool wide;
 
@@ -582,9 +593,13 @@ class _SignInOrRegisterPanelState extends State<_SignInOrRegisterPanel>
           child: TabBarView(
             controller: _tabs,
             children: [
-              _LoginForm(onDone: widget.onDone),
+              _LoginForm(
+                onDone: widget.onDone,
+                accountingService: widget.accountingService,
+              ),
               _RegisterForm(
                 onDone: widget.onDone,
+                accountingService: widget.accountingService,
                 onRegisterStarted: widget.onRegisterStarted,
                 onRegisterFailed: widget.onRegisterFailed,
                 onRegisterSuccess: widget.onRegisterSuccess,
@@ -598,8 +613,12 @@ class _SignInOrRegisterPanelState extends State<_SignInOrRegisterPanel>
 }
 
 class _LoginForm extends StatefulWidget {
-  const _LoginForm({required this.onDone});
+  const _LoginForm({
+    required this.onDone,
+    this.accountingService,
+  });
   final VoidCallback onDone;
+  final AccountingService? accountingService;
 
   @override
   State<_LoginForm> createState() => _LoginFormState();
@@ -678,6 +697,10 @@ class _LoginFormState extends State<_LoginForm> {
           ),
         );
       }
+      await widget.accountingService?.syncStaffSessionAfterVoucherAuth(
+        email: email,
+        password: pwd,
+      );
       widget.onDone();
     } on VoucherOfflineException {
       if (!mounted) return;
@@ -941,11 +964,13 @@ class _RegisterForm extends StatefulWidget {
     required this.onRegisterStarted,
     required this.onRegisterFailed,
     required this.onRegisterSuccess,
+    this.accountingService,
   });
   final VoidCallback onDone;
   final VoidCallback onRegisterStarted;
   final VoidCallback onRegisterFailed;
   final Future<void> Function(String fullName) onRegisterSuccess;
+  final AccountingService? accountingService;
 
   @override
   State<_RegisterForm> createState() => _RegisterFormState();
@@ -1040,6 +1065,10 @@ class _RegisterFormState extends State<_RegisterForm> {
       final name = displayName.isNotEmpty
           ? displayName
           : (VoucherSessionManager.instance.session?.fullName ?? '');
+      await widget.accountingService?.syncStaffSessionAfterVoucherAuth(
+        email: email,
+        password: pwd,
+      );
       await widget.onRegisterSuccess(name);
     } on VoucherOfflineException {
       widget.onRegisterFailed();
@@ -2139,7 +2168,7 @@ class _DeviceTransferDialogState extends State<_DeviceTransferDialog> {
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 480),
+        constraints: UiStyleTokens.dialogConstraints(context, designMaxWidth: 480),
         child: AnimatedSize(
           duration: const Duration(milliseconds: 220),
           curve: Curves.easeOutCubic,

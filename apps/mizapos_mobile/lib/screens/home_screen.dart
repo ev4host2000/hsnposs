@@ -15,9 +15,6 @@ import 'package:mizapos_mobile/services/voucher_session_manager.dart';
 import 'package:mizapos_mobile/screens/my_account_screen.dart';
 import 'package:mizapos_mobile/screens/subscriber_account_screen.dart';
 import 'package:mizapos_mobile/screens/admin_cancellation_screens.dart';
-import 'package:mizapos_mobile/screens/distributor_field_orders_screens.dart';
-import 'package:mizapos_mobile/screens/distributor_field_expenses_screens.dart';
-import 'package:mizapos_mobile/screens/distributor_field_returns_screens.dart';
 import 'package:mizapos_mobile/screens/printer_tools_screen.dart';
 import 'package:mizapos_mobile/screens/cash_screen.dart';
 import 'package:mizapos_mobile/screens/customer_screen.dart';
@@ -32,7 +29,6 @@ import 'package:mizapos_mobile/screens/shared/ui_style_tokens.dart';
 import 'package:mizapos_mobile/screens/users_security_screen.dart';
 import 'package:mizapos_mobile/widgets/invoice_lifecycle_dialogs.dart';
 import 'package:mizapos_mobile/widgets/role_quick_login_sheet.dart';
-import 'package:mizapos_mobile/widgets/distributor_hub_panel.dart';
 import 'package:mizapos_mobile/widgets/session_identity.dart';
 import 'package:mizapos_mobile/screens/audit_log_filter_dialog.dart';
 import 'package:mizapos_mobile/screens/classic_reports_screen.dart';
@@ -52,6 +48,7 @@ import 'package:mizapos_mobile/auth/auth_dial_codes.dart';
 import 'package:printing/printing.dart';
 import 'package:mizapos_mobile/security/security_preferences.dart';
 import 'package:mizapos_mobile/config/remote_update_config.dart';
+import 'package:mizapos_mobile/config/app_distribution_config.dart';
 import 'package:mizapos_mobile/config/remote_signup_config.dart';
 import 'package:mizapos_mobile/services/app_shutdown.dart';
 import 'package:mizapos_mobile/services/accounting_service.dart';
@@ -62,9 +59,6 @@ import 'package:mizapos_mobile/services/store_settings_ui_prefs.dart';
 import 'package:mizapos_mobile/services/android_apk_install.dart';
 import 'package:mizapos_mobile/services/app_update_service.dart';
 import 'package:mizapos_mobile/services/developer_feedback_mailer.dart';
-import 'package:mizapos_mobile/services/field_catalog_sync_service.dart';
-import 'package:mizapos_mobile/services/field_truck_stock_sync_service.dart';
-import 'package:mizapos_mobile/services/field_orders_outbox_service.dart';
 import 'package:mizapos_mobile/services/license_gate.dart';
 import 'package:mizapos_mobile/services/local_notifications_service.dart';
 import 'package:mizapos_mobile/services/remote_signup_api.dart';
@@ -80,11 +74,14 @@ import 'package:mizapos_mobile/widgets/desktop_greeting_dialogs.dart';
 import 'package:mizapos_mobile/widgets/simple_calculator_dialog.dart';
 import 'package:mizapos_mobile/widgets/calendar_appointments_dialog.dart';
 import 'package:mizapos_mobile/widgets/currency_converter_dialog.dart';
+import 'package:mizapos_mobile/widgets/add_product_dialog.dart';
+import 'package:mizapos_mobile/utils/product_catalog_add_gate.dart';
 import 'package:intl/intl.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:url_launcher/url_launcher.dart';
+import 'package:uuid/uuid.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, required this.accountingService});
@@ -111,11 +108,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   /// عند `true` تُعرض في القائمة الإدارية: إلغاء سند قبض/صرف، وإلغاء مبلغ صندوق/مدفوعات.
   static const bool _showCancelVoucherAdminMenuItems = false;
 
-  bool get _isDistributorRole {
-    final role =
-        (widget.accountingService.session?.role ?? '').trim().toLowerCase();
-    return role == 'distributor';
-  }
+  static const _catalogUuid = Uuid();
 
   late NumberFormat _moneyFormat;
   late NumberFormat _numberFormat;
@@ -184,11 +177,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   /// عناوين مخصصة لمربعات الشاشة الرئيسية (المفتاح → نص العرض).
   Map<String, String> _dashboardTileLabels = {};
   StoreUiPreferences _uiPrefs = StoreUiPreferences.defaults;
-  bool _stockNotifyShownSession = false;
   bool _pendingActivationBannerShownSession = false;
   bool _accessSuspendedBannerShownSession = false;
   bool _backupReminderShownSession = false;
-  bool _distributorCloudAutoSyncDone = false;
 
   AppUpdateManifest? _availableUpdate;
   String? _windowsNotifSentForVersion;
@@ -434,30 +425,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         .addPostFrameCallback((_) => _showLicenseStateBannersIfNeeded());
     await _maybeSubscriptionExpiryReminders();
     unawaited(_maybeCheckAppUpdate());
-    if (_isDistributorRole) {
-      unawaited(_syncDistributorFieldOrdersInBackground());
-    }
-  }
-
-  Future<void> _syncDistributorFieldOrdersInBackground() async {
-    if (!RemoteSignupConfig.activationServerEnabled) return;
-    try {
-      final outbox = FieldOrdersOutboxService(
-        accountingService: widget.accountingService,
-      );
-      await outbox.syncAllPending();
-      await outbox.refreshStatuses();
-      final catalog = FieldCatalogSyncService(
-        accountingService: widget.accountingService,
-      );
-      await catalog.pullToLocalCache();
-      final truck = FieldTruckStockSyncService(
-        accountingService: widget.accountingService,
-      );
-      await truck.pullToLocalCache();
-    } on Object {
-      /* تجاهل — المزامنة اختيارية عند العودة للتطبيق */
-    }
   }
 
   void _startLicenseForegroundSyncTimer() {
@@ -627,10 +594,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           FilledButton(
             onPressed: () async {
               messenger.hideCurrentMaterialBanner();
+              if (Platform.isAndroid && AppDistributionConfig.isPlayStore) {
+                await AppUpdateService.openPlayStoreListing();
+                return;
+              }
               if (!mounted) return;
               await _showProgramUpdateDialog();
             },
-            child: Text(loc.updateInAppInstallButton),
+            child: Text(
+              Platform.isAndroid && AppDistributionConfig.isPlayStore
+                  ? loc.updatePlayStoreButton
+                  : loc.updateInAppInstallButton,
+            ),
           ),
         ],
       ),
@@ -981,7 +956,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       _kpiTrendPeriodMarker = null;
       _kpiPeriod = DashboardKpiPeriod.allTime;
       _currentUsername = widget.accountingService.session?.username ?? '-';
-      _stockNotifyShownSession = false;
       _pendingActivationBannerShownSession = false;
       _accessSuspendedBannerShownSession = false;
       _supplierPayNotifiedSessionKeys.clear();
@@ -1196,24 +1170,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         _supplierPayReminders = payRem;
       });
       _notifySupplierPayRemindersImmediately(payRem);
-      if (_uiPrefs.notifyOutOfStock &&
-          low.isNotEmpty &&
-          !_stockNotifyShownSession &&
-          mounted) {
-        _stockNotifyShownSession = true;
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted) return;
-          final loc = AppLocalizations.of(context);
-          OverlayNoticeBanner.showMessage(
-            context,
-            message: loc.lowStockSnack(low.length),
-            duration: const Duration(seconds: 8),
-            actionLabel: loc.viewAction,
-            onAction: _showNotificationsHub,
-            nearTop: true,
-          );
-        });
-      }
     }
   }
 
@@ -1586,19 +1542,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     ),
                     body: Column(
                       children: [
-                        if (!_isDistributorRole) ...[
-                          _VoucherReadOnlyBanner(
-                            onOpenActivation: _openSubscriptionActivationFlow,
-                          ),
-                          if (_uiPrefs.showDashboardGreetingBanner)
-                            _buildHeroSummaryHeader(),
-                          if (_uiPrefs.isHomeKpiStatsStripVisible) _buildKpiStrip(),
-                          _buildLicenseSummaryStrip(),
-                        ],
+                        _VoucherReadOnlyBanner(
+                          onOpenActivation: _openSubscriptionActivationFlow,
+                        ),
+                        if (_uiPrefs.showDashboardGreetingBanner)
+                          _buildHeroSummaryHeader(),
+                        if (_uiPrefs.isHomeKpiStatsStripVisible) _buildKpiStrip(),
+                        _buildLicenseSummaryStrip(),
                         Expanded(
-                          child: _isDistributorRole
-                              ? _buildDistributorHub(context)
-                              : LayoutBuilder(
+                          child: LayoutBuilder(
                             builder: (context, constraints) {
                               final height = constraints.maxHeight;
                               // هاتف/عرض ضيق: عمودان؛ لاب توب وسطح مكتب: 4 مربعات في كل صف.
@@ -1658,94 +1610,30 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         if (!isMobileLayout) _buildBottomControlCell(),
                       ],
                     ),
-                    bottomNavigationBar: isMobileLayout && !_isDistributorRole
-                        ? SafeArea(
-                            top: false,
-                            child: NavigationBar(
-                              height: 64,
-                              backgroundColor:
-                                  Theme.of(context).colorScheme.surface,
-                              indicatorColor: Colors.transparent,
-                              labelBehavior:
-                                  NavigationDestinationLabelBehavior.alwaysHide,
-                              selectedIndex: 0,
-                              onDestinationSelected: (index) async {
-                                if (_isDistributorRole) {
-                                  if (index == 0) {
-                                    await _openSessionIdentitySheet();
-                                  }
-                                  return;
-                                }
-                                switch (index) {
-                                  case 0:
-                                    await _showSaleDialog();
-                                    break;
-                                  case 1:
-                                    await _showPurchaseDialog();
-                                    break;
-                                  case 2:
-                                    await _openSubscriptionActivationFlow();
-                                    break;
-                                  case 3:
-                                    await _interactiveBackup();
-                                    break;
-                                  case 4:
-                                    await _openSessionIdentitySheet();
-                                    break;
-                                }
-                                if (mounted) {
-                                  await _loadDashboard();
-                                }
-                              },
-                              destinations: [
-                                if (!_isDistributorRole) ...[
-                                  NavigationDestination(
-                                    icon: _mobileBrightIconChip(
-                                      Icons.point_of_sale_rounded,
-                                      _MobileBrightIconStyle.blue,
-                                    ),
-                                    label: 'sale',
-                                  ),
-                                  NavigationDestination(
-                                    icon: _mobileBrightIconChip(
-                                      Icons.shopping_bag_rounded,
-                                      _MobileBrightIconStyle.orange,
-                                    ),
-                                    label: 'purchase',
-                                  ),
-                                  NavigationDestination(
-                                    icon: _mobileBrightIconChip(
-                                      _isVoucherActive
-                                          ? Icons.verified_rounded
-                                          : Icons.key_rounded,
-                                      _isVoucherActive
-                                          ? _MobileBrightIconStyle.emerald
-                                          : _MobileBrightIconStyle.amber,
-                                    ),
-                                    label: 'activation',
-                                    tooltip: AppLocalizations.of(context)
-                                        .activationSubscriptionButtonTooltip,
-                                  ),
-                                  NavigationDestination(
-                                    icon: _mobileBrightIconChip(
-                                      Icons.backup_rounded,
-                                      _MobileBrightIconStyle.sky,
-                                    ),
-                                    label: 'backup',
-                                    tooltip: AppLocalizations.of(context)
-                                        .backupTooltip,
-                                  ),
-                                ],
-                                NavigationDestination(
-                                  icon: _buildMobileBottomRoleIcon(),
-                                  selectedIcon:
-                                      _buildMobileBottomRoleIcon(selected: true),
-                                  label: 'account',
-                                  tooltip: AppLocalizations.of(context)
-                                      .sessionIdentityTapTooltip,
-                                ),
-                              ],
-                            ),
+                    bottomNavigationBar: isMobileLayout
+                        ? _MobileHomeBottomNavBar(
+                            loc: AppLocalizations.of(context),
+                            isVoucherActive: _isVoucherActive,
+                            onAddProduct: () async {
+                              await _openAddProductQuick();
+                              if (mounted) await _loadDashboard();
+                            },
+                            onPurchase: () async {
+                              await _showPurchaseDialog();
+                              if (mounted) await _loadDashboard();
+                            },
+                            onSale: () async {
+                              await _showSaleDialog();
+                              if (mounted) await _loadDashboard();
+                            },
+                            onActivation: () async {
+                              await _openSubscriptionActivationFlow();
+                              if (mounted) await _loadDashboard();
+                            },
+                            onBackup: () async {
+                              await _interactiveBackup();
+                              if (mounted) await _loadDashboard();
+                            },
                           )
                         : null,
                   ),
@@ -2818,243 +2706,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     return m;
   }
 
-  Future<void> _openDistributorReturns(BuildContext context) async {
-    Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(
-        builder: (_) => DistributorFieldReturnsListScreen(
-          accountingService: widget.accountingService,
-          currencyCode: _baseCurrencyCode,
-          currencyParts: _currencyParts,
-        ),
-      ),
-    );
-  }
-
-  Future<void> _openDistributorExpenses(BuildContext context) async {
-    final loc = AppLocalizations.of(context);
-    final distributorName =
-        await widget.accountingService.currentUserDisplayName();
-    await showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) {
-        return Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-          ),
-          child: SafeArea(
-            top: false,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const SizedBox(height: 8),
-                Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.black26,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.payments_outlined,
-                          color: Color(0xFF059669)),
-                      const SizedBox(width: 10),
-                      Text(
-                        loc.distributorExpenses,
-                        style: Theme.of(ctx).textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.w800,
-                            ),
-                      ),
-                    ],
-                  ),
-                ),
-                ListTile(
-                  leading: const CircleAvatar(
-                    backgroundColor: Color(0xFFD1FAE5),
-                    child: Icon(Icons.add_card_rounded,
-                        color: Color(0xFF059669)),
-                  ),
-                  title: Text(loc.distributorNewExpense),
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    unawaited(
-                      Navigator.of(context).push<bool>(
-                        MaterialPageRoute<bool>(
-                          builder: (_) => DistributorFieldExpenseComposeScreen(
-                            accountingService: widget.accountingService,
-                            currencyCode: _baseCurrencyCode,
-                            currencyParts: _currencyParts,
-                            distributorDisplayName: distributorName,
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-                ListTile(
-                  leading: const CircleAvatar(
-                    backgroundColor: Color(0xFFD1FAE5),
-                    child: Icon(Icons.history_rounded, color: Color(0xFF059669)),
-                  ),
-                  title: Text(loc.distributorMyExpenses),
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    Navigator.of(context).push<void>(
-                      MaterialPageRoute<void>(
-                        builder: (_) => DistributorFieldExpensesListScreen(
-                          accountingService: widget.accountingService,
-                          currencyCode: _baseCurrencyCode,
-                          currencyParts: _currencyParts,
-                          distributorDisplayName: distributorName,
-                        ),
-                      ),
-                    );
-                  },
-                ),
-                const SizedBox(height: 8),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildDistributorHub(BuildContext context) {
-    final loc = AppLocalizations.of(context);
-    final svc = widget.accountingService;
-    final cloudPending =
-        svc.isSessionCloudDistributor && !svc.hasDistributorCloudAccess;
-
-    if (cloudPending && !_distributorCloudAutoSyncDone) {
-      _distributorCloudAutoSyncDone = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) async {
-        final ok = await svc.refreshDistributorCloudLicense();
-        if (!mounted) return;
-        setState(() {});
-        if (ok) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(loc.distributorCloudSyncOk)),
-          );
-        }
-      });
-    }
-
-    return FutureBuilder<String>(
-      future: widget.accountingService.currentUserDisplayName(),
-      builder: (context, nameSnap) {
-        final distributorName = nameSnap.data ?? '';
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (cloudPending) ...[
-              Material(
-                color: const Color(0xFFFFF7ED),
-                child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Icon(Icons.cloud_off_rounded,
-                              size: 22, color: Color(0xFFC2410C)),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              loc.distributorCloudSyncPendingBanner,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 12.5,
-                                height: 1.35,
-                                color: Color(0xFF9A3412),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      FilledButton.icon(
-                        onPressed: () async {
-                          final ok = await svc.refreshDistributorCloudLicense();
-                          if (!mounted) return;
-                          setState(() {});
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                ok
-                                    ? loc.distributorCloudSyncOk
-                                    : loc.distributorCloudSyncFailed,
-                              ),
-                            ),
-                          );
-                        },
-                        icon: const Icon(Icons.sync_rounded, size: 18),
-                        label: Text(loc.distributorCloudSyncButton),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-            Expanded(
-              child: DistributorHubPanel(
-                displayName: distributorName,
-                loc: loc,
-                isLocalDistributor:
-                    svc.isSessionLocalDistributor || cloudPending,
-                onOpenIdentity: () => unawaited(_openSessionIdentitySheet()),
-                onNewSale: () {
-                  unawaited(
-                    Navigator.of(context).push<bool>(
-                      MaterialPageRoute<bool>(
-                        builder: (_) => DistributorFieldOrderComposeScreen(
-                          accountingService: widget.accountingService,
-                          currencyCode: _baseCurrencyCode,
-                          currencyParts: _currencyParts,
-                          taxPercent: _taxPercent,
-                          distributorDisplayName: distributorName,
-                        ),
-                      ),
-                    ),
-                  );
-                },
-                onMySales: () {
-                  Navigator.of(context).push<void>(
-                    MaterialPageRoute<void>(
-                      builder: (_) => DistributorFieldOrdersListScreen(
-                        accountingService: widget.accountingService,
-                        currencyCode: _baseCurrencyCode,
-                        currencyParts: _currencyParts,
-                        taxPercent: _taxPercent,
-                        distributorDisplayName: distributorName,
-                      ),
-                    ),
-                  );
-                },
-                onQuickNotes: () => unawaited(_showQuickScratchpadDialog()),
-                onCalculator: () => showSimpleCalculatorDialog(context),
-                onReturns: () => unawaited(_openDistributorReturns(context)),
-                onExpenses: () => unawaited(_openDistributorExpenses(context)),
-                onExitToMainApp: () async {
-                  if (!await _confirmStaffLogout(context)) return;
-                  await _returnToGuestSession();
-                },
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
   List<_MenuCardConfig> _visibleDashboardTilesInOrder(BuildContext context) {
     final reg = _buildDashboardTileRegistry(context);
     final out = <_MenuCardConfig>[];
@@ -3624,38 +3275,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               color: scheme.onSurface.withValues(alpha: 0.52),
             ),
           ),
-          if (_lowStock.isNotEmpty) ...[
-            const SizedBox(height: 6),
-            Material(
-              color: Colors.orange.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(12),
-              child: InkWell(
-                onTap: _showLowStockDialog,
-                borderRadius: BorderRadius.circular(12),
-                child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  child: Row(
-                    children: [
-                      Icon(Icons.inventory_2_outlined,
-                          color: Colors.orange.shade900, size: 22),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          loc.lowStockSnack(_lowStock.length),
-                          style: TextStyle(
-                            fontWeight: FontWeight.w700,
-                            color: Colors.orange.shade900,
-                            height: 1.25,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ],
         ],
       ),
     );
@@ -3777,14 +3396,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     return svc.licenseGate.hasRegisteredOperationalAccess(now);
   }
 
-  /// هل الجلسة الحالية للمالك؟ (لتقييد إدارة الاشتراك/تحرير الجهاز
-  /// على مالك النظام دون أعضاء فريق العمل أو وضع الزائر).
-  bool get _isOwnerSession {
-    final svc = widget.accountingService;
-    if (svc.isGuestSession) return false;
-    return svc.session?.role == 'owner';
-  }
-
   /// إدارة حساب المشترك (تسجيل خروج، إدارة القسيمة) — للمالك/مدير الفرع
   /// أو للمشترك في وضع الزائر بجلسة قسيمة نشطة.
   bool get _canManageSubscriberAccount {
@@ -3801,7 +3412,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (!mounted) return;
     await showVoucherActivationDialog(
       context,
-      allowSubscriberManagement: _isOwnerSession,
+      allowSubscriberManagement: _canManageSubscriberAccount,
     );
     if (!mounted) return;
     // التزامن مع نظام التراخيص القديم (إن وُجد) + إعادة بناء.
@@ -3818,16 +3429,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
     if (!mounted) return;
     setState(() {});
-  }
-
-  Widget _buildMobileBottomRoleIcon({bool selected = false}) {
-    final roleColors = SessionRolePalette.colorsFor(_appBarStaffRole);
-    final icon = SessionRolePalette.iconFor(_appBarStaffRole);
-    return Icon(
-      icon,
-      size: selected ? 26 : 24,
-      color: roleColors.fg,
-    );
   }
 
   /// يفتح لوحة الهوية والدور: تبديل الحساب أو تسجيل الدخول/الخروج.
@@ -4789,6 +4390,55 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
+  Future<void> _openAddProductQuick() async {
+    if (!await ensureCanAddCatalogProduct(
+      context,
+      widget.accountingService,
+    )) {
+      return;
+    }
+    final session = widget.accountingService.session;
+    if (session == null) return;
+    final result = await showAddProductDialog(
+      context,
+      variant: AddProductDialogVariant.inventory,
+      accountingService: widget.accountingService,
+    );
+    if (result == null || !mounted) return;
+    try {
+      final id = _catalogUuid.v4();
+      await widget.accountingService.addProduct(
+        ProductEntity(
+          id: id,
+          organizationId: session.organizationId,
+          branchId: session.branchId,
+          name: result.name,
+          salePrice: result.salePrice,
+          costPrice: result.costPrice,
+          stockQty: result.stockQty,
+          barcode: result.barcode,
+          categoryId: result.categoryId,
+          description: result.description,
+          unitName: result.unitName,
+          imagePath: result.imagePath,
+          isHidden: result.isHidden,
+          isFrozen: result.isFrozen,
+          isService: result.isService,
+          expiryDate: result.expiryDate,
+        ),
+      );
+      await widget.accountingService.replaceProductSaleUnits(
+        productId: id,
+        units: result.saleUnits,
+      );
+      if (!mounted) return;
+      _showSuccess(AppLocalizations.of(context).invProductAdded);
+    } on Object catch (e) {
+      if (!mounted) return;
+      _showError(e.toString());
+    }
+  }
+
   Future<void> _showSaleDialog() async {
     await Navigator.push<void>(
       context,
@@ -4943,7 +4593,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     return value.toString();
   }
 
-  /// حوار لطيف يُعرَض عند محاولة فتح إعدادات المتجر دون حساب مدير.
+  /// حوار يُعرَض عند محاولة فتح إعدادات المتجر دون تسجيل دخول موظف.
   Future<void> _showSettingsManagerOnlyDialog() async {
     if (!mounted) return;
     await showDialog<void>(
@@ -6256,15 +5906,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         backgroundColor: Colors.green.shade700,
       ),
     );
-  }
-
-  /// أيقونة الشريط السفلي في الرئيسية (بدون خلفية ملوّنة).
-  Widget _mobileBrightIconChip(
-    IconData icon,
-    Color tint, {
-    double size = 24,
-  }) {
-    return Icon(icon, size: size, color: tint);
   }
 
   Widget _adminMenuTile(
@@ -7620,7 +7261,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                     await showVoucherActivationDialog(
                                       homeContext,
                                       allowSubscriberManagement:
-                                          _isOwnerSession,
+                                          _canManageSubscriberAccount,
                                     );
                                     if (mounted) {
                                       await widget.accountingService
@@ -8817,6 +8458,277 @@ class _ToggleThemeIntent extends Intent {
   const _ToggleThemeIntent();
 }
 
+/// شريط تنقّل سفلي للجوال: خلفية منظمة + مبيعات بارزة في الوسط.
+class _MobileHomeBottomNavBar extends StatelessWidget {
+  const _MobileHomeBottomNavBar({
+    required this.loc,
+    required this.isVoucherActive,
+    required this.onAddProduct,
+    required this.onPurchase,
+    required this.onSale,
+    required this.onActivation,
+    required this.onBackup,
+  });
+
+  final AppLocalizations loc;
+  final bool isVoucherActive;
+  final Future<void> Function() onAddProduct;
+  final Future<void> Function() onPurchase;
+  final Future<void> Function() onSale;
+  final Future<void> Function() onActivation;
+  final Future<void> Function() onBackup;
+
+  bool get _isAr => loc.locale.languageCode == 'ar';
+
+  static const double _barHeight = 62;
+  static const double _heroSize = 64;
+  static const double _heroTopInset = 20;
+  static const double _centerGap = 72;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final barFill = isDark ? cs.surfaceContainerHigh : cs.surface;
+    final barBorder = cs.outlineVariant.withValues(alpha: isDark ? 0.45 : 0.28);
+    final saleLabel = _isAr ? 'بيع' : 'Sale';
+
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+        child: SizedBox(
+          height: _heroTopInset + _barHeight,
+          child: Stack(
+            clipBehavior: Clip.none,
+            alignment: Alignment.topCenter,
+            children: [
+              Positioned(
+                left: 0,
+                right: 0,
+                top: _heroTopInset,
+                child: Container(
+                  height: _barHeight,
+                  decoration: BoxDecoration(
+                    color: barFill,
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: barBorder, width: 1),
+                    boxShadow: [
+                      BoxShadow(
+                        color:
+                            Colors.black.withValues(alpha: isDark ? 0.38 : 0.07),
+                        blurRadius: 22,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(4, 0, 4, 6),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Expanded(
+                          child: _MobileBottomNavTap(
+                            icon: Icons.inventory_2_rounded,
+                            color: const Color(0xFF059669),
+                            label: _isAr ? 'إضافة' : 'Add',
+                            tooltip: loc.invAddProductTitle,
+                            onTap: onAddProduct,
+                          ),
+                        ),
+                        Expanded(
+                          child: _MobileBottomNavTap(
+                            icon: Icons.shopping_bag_rounded,
+                            color: _MobileBrightIconStyle.orange,
+                            label: _isAr ? 'شراء' : 'Buy',
+                            tooltip: loc.navPurchases,
+                            onTap: onPurchase,
+                          ),
+                        ),
+                        SizedBox(
+                          width: _centerGap,
+                          child: Text(
+                            saleLabel,
+                            textAlign: TextAlign.center,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                              height: 1,
+                              color: _MobileBottomNavSaleHero.heroBlue,
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: _MobileBottomNavTap(
+                            icon: isVoucherActive
+                                ? Icons.verified_rounded
+                                : Icons.key_rounded,
+                            color: isVoucherActive
+                                ? _MobileBrightIconStyle.emerald
+                                : _MobileBrightIconStyle.amber,
+                            label: _isAr ? 'تفعيل' : 'License',
+                            tooltip: loc.activationSubscriptionButtonTooltip,
+                            onTap: onActivation,
+                          ),
+                        ),
+                        Expanded(
+                          child: _MobileBottomNavTap(
+                            icon: Icons.backup_rounded,
+                            color: _MobileBrightIconStyle.sky,
+                            label: _isAr ? 'نسخ' : 'Backup',
+                            tooltip: loc.backupTooltip,
+                            onTap: onBackup,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              Positioned(
+                top: 0,
+                child: _MobileBottomNavSaleHero(
+                  size: _heroSize,
+                  tooltip: loc.navSales,
+                  ringColor: barFill,
+                  onTap: onSale,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MobileBottomNavTap extends StatelessWidget {
+  const _MobileBottomNavTap({
+    required this.icon,
+    required this.color,
+    required this.label,
+    required this.tooltip,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final Color color;
+  final String label;
+  final String tooltip;
+  final Future<void> Function() onTap;
+
+  static const double _itemHeight = 50;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => unawaited(onTap()),
+          borderRadius: BorderRadius.circular(14),
+          child: SizedBox(
+            height: _itemHeight,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(11),
+                  ),
+                  child: Icon(icon, size: 20, color: color),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    height: 1,
+                    color: cs.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MobileBottomNavSaleHero extends StatelessWidget {
+  const _MobileBottomNavSaleHero({
+    required this.size,
+    required this.tooltip,
+    required this.ringColor,
+    required this.onTap,
+  });
+
+  final double size;
+  final String tooltip;
+  final Color ringColor;
+  final Future<void> Function() onTap;
+
+  static const heroBlue = Color(0xFF2563EB);
+  static const _heroBlueDark = Color(0xFF1D4ED8);
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => unawaited(onTap()),
+          customBorder: const CircleBorder(),
+          child: Container(
+            width: size,
+            height: size,
+            padding: const EdgeInsets.all(3.5),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: ringColor,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.08),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Container(
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [heroBlue, _heroBlueDark],
+                ),
+              ),
+              child: Icon(
+                Icons.point_of_sale_rounded,
+                color: Colors.white,
+                size: size * 0.42,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// ألوان زاهية لأيقونات قائمة إدارة النظام على الجوال.
 abstract final class _MobileBrightIconStyle {
   static const menuBgAlpha = 0.2;
@@ -9397,6 +9309,19 @@ class _ModernProgramUpdateDialogState
 
   Future<void> _startInAppInstall(AppUpdateManifest manifest) async {
     if (_installingUpdate || !mounted) return;
+    if (Platform.isAndroid && AppDistributionConfig.isPlayStore) {
+      try {
+        await AppUpdateService.openPlayStoreListing();
+      } on Object catch (e) {
+        if (!mounted) return;
+        setState(() {
+          _installError =
+              AppLocalizations.of(context).updateInAppInstallFailed('$e');
+          _installingUpdate = false;
+        });
+      }
+      return;
+    }
     if (!await _ensureBackupBeforeUpdate()) return;
 
     final loc = AppLocalizations.of(context);
@@ -9868,11 +9793,14 @@ class _ModernProgramUpdateDialogState
                             ),
                             const SizedBox(height: 12),
                             Text(
-                              loc.updateInAppAvailableLine(
-                                AppUpdateManifest.formatForDisplay(
-                                  newer.latestVersion,
-                                ),
-                              ),
+                              Platform.isAndroid &&
+                                      AppDistributionConfig.isPlayStore
+                                  ? loc.updatePlayStoreAvailableLine
+                                  : loc.updateInAppAvailableLine(
+                                      AppUpdateManifest.formatForDisplay(
+                                        newer.latestVersion,
+                                      ),
+                                    ),
                               style: theme.textTheme.titleMedium?.copyWith(
                                 color: Colors.white,
                                 fontWeight: FontWeight.w800,
@@ -9912,8 +9840,18 @@ class _ModernProgramUpdateDialogState
                               onPressed: _installingUpdate
                                   ? null
                                   : () => _startInAppInstall(newer),
-                              icon: const Icon(Icons.download_done_rounded),
-                              label: Text(loc.updateInAppInstallButton),
+                              icon: Icon(
+                                Platform.isAndroid &&
+                                        AppDistributionConfig.isPlayStore
+                                    ? Icons.shop_rounded
+                                    : Icons.download_done_rounded,
+                              ),
+                              label: Text(
+                                Platform.isAndroid &&
+                                        AppDistributionConfig.isPlayStore
+                                    ? loc.updatePlayStoreButton
+                                    : loc.updateInAppInstallButton,
+                              ),
                             ),
                           ],
                         ),

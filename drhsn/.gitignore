@@ -1,0 +1,5 @@
+.env
+.env.local
+/data/*.db
+/data/*.sqlite
+/data/*.sqlite3

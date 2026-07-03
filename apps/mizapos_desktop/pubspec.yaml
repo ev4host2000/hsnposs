@@ -1,5 +1,5 @@
 name: mizapos_desktop
-version: 1.0.36+37
+version: 1.0.37+38
 description: MizaPos — واجهة سطح المكتب (Windows).
 
 publish_to: none
@@ -31,6 +31,7 @@ dependencies:
   http: ^1.3.0
   flutter_local_notifications: ^21.0.0
   window_manager: ^0.5.1
+  screen_retriever: ^0.2.0
   shared_preferences: ^2.5.5
   pub_semver: ^2.2.0
   desktop_multi_window: ^0.3.0

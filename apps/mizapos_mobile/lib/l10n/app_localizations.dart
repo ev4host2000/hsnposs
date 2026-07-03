@@ -1,8 +1,8 @@
-﻿import 'package:flutter/material.dart';
-import 'package:mizapos_desktop/models/dashboard_kpi_period.dart';
-import 'package:mizapos_desktop/models/miza_payment_types.dart';
-import 'package:mizapos_desktop/security/security_preferences.dart';
-import 'package:mizapos_desktop/services/excel_import_service.dart';
+import 'package:flutter/material.dart';
+import 'package:mizapos_mobile/models/dashboard_kpi_period.dart';
+import 'package:mizapos_mobile/models/miza_payment_types.dart';
+import 'package:mizapos_mobile/security/security_preferences.dart';
+import 'package:mizapos_mobile/services/excel_import_service.dart';
 
 /// ترجمات الواجهة (عربي / إنجليزي) بدون codegen.
 class AppLocalizations {
@@ -160,13 +160,7 @@ class AppLocalizations {
       );
   String get homeQuickNotesSaved => _t('تم حفظ الملاحظات.', 'Notes saved.');
 
-  String get homeDistributorsHubTitle =>
-      _t('منظومة الموزعون', 'Distributors hub');
-
-  String get homeDistributorsHubTooltip => _t(
-        'تحميل السيارات ومبيعات الميدان والتقارير',
-        'Vehicle loads, field sales, and reports',
-      );
+  // --- بطاقة سعر الاشتراك (تظهر قبل التسجيل/التفعيل) ---
 
   String get subscriptionPlanTitle =>
       _t('خطة اشتراك MizaPos', 'MizaPos subscription plan');
@@ -229,6 +223,8 @@ class AppLocalizations {
         'منفصلة عن قسيمة POS — مزامنة الميدان مع 10 أجهزة جوال.',
         'Separate from POS voucher — field sync with up to 10 mobile devices.',
       );
+
+  // --- التقويم والمواعيد (شريط سفلي) ---
 
   String get homeCalendarAppointmentsTitle =>
       _t('التقويم والمواعيد', 'Calendar & reminders');
@@ -2388,6 +2384,7 @@ class AppLocalizations {
         'This screen is not available in guest mode. Sign in with a staff account to access it.',
       );
 
+  /// رسالة الإغلاق: الميزة تتطلّب اشتراكاً مُفعَّلاً بقسيمة.
   String get featureRequiresActivationTitle =>
       _t('ميزة مرتبطة بالاشتراك', 'Subscription required');
   String get featureRequiresActivationBody => _t(
@@ -2413,6 +2410,10 @@ class AppLocalizations {
   String get usersTeamSyncCredentialsMissing => _t(
         'تعذّر سحب الموظفين من السحابة — تأكد من تفعيل القسيمة بنفس بريد المالك على هذا الجهاز.',
         'Could not pull employees from cloud — activate the voucher with the owner e-mail on this device.',
+      );
+  String usersTeamSyncImported(int n) => _t(
+        'تم سحب $n موظفاً من السحابة.',
+        'Pulled $n employee(s) from cloud.',
       );
   String get usersColActions => _t('الإجراءات', 'Actions');
   String get usersLoginIdentifierHint => _t(
@@ -2458,10 +2459,6 @@ class AppLocalizations {
         'Leave password blank to keep the current one',
       );
   String get usersUpdatedOk => _t('تم تحديث بيانات العضو.', 'Member updated.');
-  String get usersSavedLocalCloudSyncFailed => _t(
-        'حُفظ الحساب محلياً؛ فشلت المزامنة السحابية:',
-        'Account saved locally; cloud sync failed:',
-      );
   String get usersDeletedOk => _t('تم حذف العضو.', 'Member removed.');
   String get usersCannotDeleteSelf => _t(
       'لا يمكن حذف الحساب الحالي.', 'You cannot delete the signed-in account.');
@@ -2880,14 +2877,6 @@ class AppLocalizations {
         'أدوات مساعدة بجانب زر التقويم.',
         'Helper tools next to the calendar button.',
       );
-  String get secHomeFooterDistributorsHub => _t(
-        'زر منظومة الموزعون',
-        'Distributors hub button',
-      );
-  String get secHomeFooterDistributorsHubSub => _t(
-        'في الشريط السفلي بجانب المفكرة السريعة (سطح المكتب).',
-        'In the desktop home footer next to quick notepad.',
-      );
   String get secNotifyCalendarAppointments =>
       _t('تنبيهات موعد التقويم', 'Calendar appointment alerts');
   String get secNotifyCalendarAppointmentsSub => _t(
@@ -3120,62 +3109,6 @@ class AppLocalizations {
         'اترك الحقل فارغًا لاستخدام الاسم الافتراضي للغة الحالية.',
         'Leave empty to use the default label for the current language.',
       );
-  String get secDashTileShortcuts =>
-      _t('اختصارات تحت المربعات', 'Shortcuts under tiles');
-  String get secDashTileShortcutsSub => _t(
-        'أزرار خفيفة تحت كل مربّع في الصفحة الرئيسية (فاتورة مبيعات، عرض سعر، …)',
-        'Quick-action chips under each home tile (sales invoice, quote, …)',
-      );
-  String get secDashShortcutsCustomize =>
-      _t('تخصيص الاختصارات', 'Customize shortcuts');
-  String get secDashShortcutsDialogHint => _t(
-        'اختر حتى 3 اختصارات لكل مربّع. اضغط على الزر لإضافته أو إزالته.',
-        'Pick up to 3 shortcuts per tile. Tap a chip to add or remove it.',
-      );
-  String get secDashShortcutsReset =>
-      _t('استعادة الافتراضي', 'Restore defaults');
-  String dashShortcutLabel(String actionId) {
-    switch (actionId) {
-      case 'sales_invoice':
-        return _t('فاتورة مبيعات', 'Sales invoice');
-      case 'sales_quote':
-        return _t('عرض سعر', 'Price quote');
-      case 'sales_archive':
-        return _t('أرشيف الفواتير', 'Invoice archive');
-      case 'purchase_invoice':
-        return _t('فاتورة شراء', 'Purchase invoice');
-      case 'purchase_archive':
-        return _t('أرشيف الشراء', 'Purchase archive');
-      case 'customers_open':
-        return _t('دليل العملاء', 'Customers');
-      case 'customers_add':
-        return _t('عميل جديد', 'New customer');
-      case 'suppliers_open':
-        return _t('دليل الموردين', 'Suppliers');
-      case 'suppliers_add':
-        return _t('مورد جديد', 'New supplier');
-      case 'cash_open':
-        return _t('حركة الصندوق', 'Cash box');
-      case 'cash_receipt':
-        return _t('قبض', 'Receipt');
-      case 'cash_payment':
-        return _t('صرف', 'Payment');
-      case 'expenses_open':
-        return _t('المصروفات', 'Expenses');
-      case 'expenses_new':
-        return _t('مصروف جديد', 'New expense');
-      case 'inventory_open':
-        return _t('المخزون', 'Inventory');
-      case 'inventory_low_stock':
-        return _t('نواقص المخزون', 'Low stock');
-      case 'queries_open':
-        return _t('الاستعلامات', 'Queries');
-      case 'queries_classic':
-        return _t('تقارير كلاسيكية', 'Classic reports');
-      default:
-        return actionId;
-    }
-  }
   String get dashboardPreviewPrefix => _t('المعاينة:', 'Preview:');
   String dashboardPreviewJoin(List<String> titles) =>
       titles.join(_en ? ' · ' : ' ← ');
@@ -3455,7 +3388,7 @@ class AppLocalizations {
       _t('آخر تحديث: $date', 'Last updated: $date');
   String get menuProgramUpdate => _t('تحديث البرنامج', 'Program update');
 
-  String get menuFieldOrders => _t('طلبات الميدان', 'Field orders');
+  String get distributorHubTitle => _t('التوزيع الميداني', 'Field distribution');
 
   String get menuPublishFieldCatalog => _t(
         'نشر كتالوج الميدان',
@@ -3482,998 +3415,10 @@ class AppLocalizations {
         'No products or customers to publish.',
       );
 
-  String get distributorCatalogSyncing => _t(
-        'جارٍ تحديث كتالوج الميدان…',
-        'Updating field catalog…',
-      );
-
   String distributorCatalogSynced(int products, int customers) => _t(
         'كتالوج الميدان: $products صنفاً · $customers عميلاً',
         'Field catalog: $products product(s) · $customers customer(s)',
       );
-
-  String get fieldOrdersScreenTitle => menuFieldOrders;
-
-  String get fieldOrdersUnavailable => _t(
-        'طلبات الميدان تتطلب اتصال خادم التفعيل وبريد اشتراك صالحاً.',
-        'Field orders require the activation server and a valid subscription e-mail.',
-      );
-
-  String get fieldOrdersReviewerLoginRequired => _t(
-        'سجّل دخول كمالك أو مدير فرع أو محاسب لاستخدام طلبات الميدان ونشر الكتالوج.',
-        'Sign in as owner, branch manager, or accountant to use field orders and publish the catalog.',
-      );
-
-  String get fieldOrdersOffline => _t(
-        'تعذر الاتصال بالخادم. تحقق من الإنترنت وحاول مجدداً.',
-        'Could not reach the server. Check your connection and try again.',
-      );
-
-  String get fieldOrdersForbidden => _t(
-        'لا صلاحية لعرض طلبات هذه المؤسسة.',
-        'No permission to view orders for this organization.',
-      );
-
-  String get fieldOrdersLoadFailed => _t(
-        'تعذر تحميل الطلبات المعلّقة.',
-        'Could not load pending orders.',
-      );
-
-  String get fieldOrdersEmpty => _t(
-        'لا توجد طلبات معلّقة من الموزّعين.',
-        'No pending distributor orders.',
-      );
-
-  String get fieldOrdersPendingBadge => _t('معلّق', 'Pending');
-
-  String fieldOrdersDistributor(String name) =>
-      _t('الموزّع: $name', 'Distributor: $name');
-
-  String fieldOrdersLineCount(int n) =>
-      _t('$n بند', n == 1 ? '1 line' : '$n lines');
-
-  String fieldOrdersTotal(String amount) =>
-      _t('الإجمالي: $amount', 'Total: $amount');
-
-  String get fieldOrdersApproveTitle => _t('اعتماد الطلب', 'Approve order');
-
-  String fieldOrdersApproveBody(String customer) => _t(
-        'اعتماد طلب العميل «$customer» وإنشاء فاتورة بيع (آجل)؟',
-        'Approve order for «$customer» and create a deferred sales invoice?',
-      );
-
-  String get fieldOrdersApproveCreatesSale => _t(
-        'يُخصم المخزون ويُسجَّل البيع في قاعدة هذا الجهاز.',
-        'Stock will be deducted and the sale recorded on this device.',
-      );
-
-  String get fieldOrdersApproveAction => _t('اعتماد', 'Approve');
-
-  String get fieldOrdersRejectTitle => _t('رفض الطلب', 'Reject order');
-
-  String get fieldOrdersRejectReasonLabel => _t('سبب الرفض', 'Rejection reason');
-
-  String get fieldOrdersRejectAction => _t('رفض', 'Reject');
-
-  String fieldOrdersApprovedOk(String invoiceId) => _t(
-        'تم الاعتماد وإنشاء فاتورة البيع.',
-        'Approved and sales invoice created.',
-      );
-
-  String get fieldOrdersRejectedOk => _t('تم رفض الطلب.', 'Order rejected.');
-
-  String fieldOrdersProductNotFound(String name) => _t(
-        'الصنف غير موجود محلياً: $name',
-        'Product not found locally: $name',
-      );
-
-  String fieldOrdersPriceRequired(String name) => _t(
-        'السعر مطلوب للصنف: $name',
-        'Price required for: $name',
-      );
-
-  String get fieldOrdersCustomerRequired => _t(
-        'اسم العميل مطلوب.',
-        'Customer name is required.',
-      );
-
-  String get fieldOrdersRejectReasonRequired => _t(
-        'أدخل سبب الرفض.',
-        'Enter a rejection reason.',
-      );
-
-  String get fieldOrdersAlreadyReviewed => _t(
-        'تمت مراجعة هذا الطلب مسبقاً.',
-        'This order was already reviewed.',
-      );
-
-  String fieldOrdersRemoteApproveFailed(String detail) => _t(
-        'تعذر اعتماد الطلب على الخادم: $detail',
-        'Could not approve the order on the server: $detail',
-      );
-
-  String get fieldOrdersApproveFailed => _t(
-        'تعذر اعتماد الطلب.',
-        'Could not approve the order.',
-      );
-
-  String fieldOrdersApproveFailedDetail(String detail) => _t(
-        'تعذر اعتماد الطلب: $detail',
-        'Could not approve the order: $detail',
-      );
-
-  String get fieldOrdersRefresh => _t('تحديث', 'Refresh');
-
-  String get fieldOrdersRetry => _t('إعادة المحاولة', 'Retry');
-
-  String get menuDistributors => _t('الموزعون', 'Distributors');
-
-  String get distributorsHubSubtitle => _t(
-        'طلبات الميدان، السيارات، والمخزون',
-        'Field orders, trucks, and inventory',
-      );
-
-  String get menuFieldExpenses => _t('مصروفات الميدان', 'Field expenses');
-
-  String get fieldExpensesUnavailable => _t(
-        'مصروفات الميدان غير متاحة — تحقق من إعدادات الخادم.',
-        'Field expenses unavailable — check server settings.',
-      );
-
-  String get fieldExpensesLoadFailed => _t(
-        'تعذّر تحميل مصروفات الميدان.',
-        'Could not load field expenses.',
-      );
-
-  String get fieldExpensesEmptyPending => _t(
-        'لا توجد مصروفات بانتظار الاعتماد.',
-        'No expenses awaiting approval.',
-      );
-
-  String get fieldExpensesApproveTitle =>
-      _t('اعتماد المصروف', 'Approve expense');
-
-  String fieldExpensesApproveBody(String title) => _t(
-        'تسجيل مصروف «$title» في دفتر المصروفات بعد الاعتماد.',
-        'Record expense «$title» in the expense ledger after approval.',
-      );
-
-  String get fieldExpensesApproveOk => _t(
-        'تم اعتماد المصروف وتسجيله.',
-        'Expense approved and recorded.',
-      );
-
-  String get fieldExpensesRejectOk => _t(
-        'تم رفض المصروف.',
-        'Expense rejected.',
-      );
-
-  String get fieldExpensesApproveFailed => _t(
-        'تعذّر اعتماد المصروف.',
-        'Could not approve expense.',
-      );
-
-  String fieldExpensesRemoteApproveFailed(String detail) => _t(
-        'تعذّر اعتماد المصروف على الخادم: $detail',
-        'Could not approve the expense on the server: $detail',
-      );
-
-  String fieldExpensesApproveFailedDetail(String detail) => _t(
-        'تعذّر اعتماد المصروف: $detail',
-        'Could not approve the expense: $detail',
-      );
-
-  String get fieldExpensesLocalExpenseFailed => _t(
-        'تعذّر تسجيل المصروف محلياً.',
-        'Could not record the expense locally.',
-      );
-
-  String get distributorsHubReturnsDesc => _t(
-        'مرتجعات العملاء وتفريغ السيارة',
-        'Customer returns and truck unload',
-      );
-
-  String get menuFieldReturns => _t('مرتجعات الميدان', 'Field returns');
-
-  String get distributorsHubReturnsCustomerDesc => _t(
-        'اعتماد مرتجعات العملاء الواردة من الميدان',
-        'Approve customer returns from the field',
-      );
-
-
-  String get fieldReturnsUnavailable => _t(
-        'مرتجعات الميدان غير متاحة — تحقق من إعدادات الخادم.',
-        'Field returns unavailable — check server settings.',
-      );
-
-  String get fieldReturnsLoadFailed => _t(
-        'تعذّر تحميل مرتجعات الميدان.',
-        'Could not load field returns.',
-      );
-
-  String get fieldReturnsEmptyPending => _t(
-        'لا توجد مرتجعات بانتظار الاعتماد.',
-        'No returns awaiting approval.',
-      );
-
-  String get fieldReturnsApproveTitle =>
-      _t('اعتماد المرتجع', 'Approve return');
-
-  String fieldReturnsApproveBody(int lineCount) => _t(
-        'تسجيل مرتجع بـ $lineCount أصناف في المحاسبة بعد الاعتماد.',
-        'Record a return of $lineCount items in accounting after approval.',
-      );
-
-  String get fieldReturnsApproveOk => _t(
-        'تم اعتماد المرتجع وتسجيله.',
-        'Return approved and recorded.',
-      );
-
-  String get fieldReturnsRejectOk => _t(
-        'تم رفض المرتجع.',
-        'Return rejected.',
-      );
-
-  String get fieldReturnsApproveFailed => _t(
-        'تعذّر اعتماد المرتجع.',
-        'Could not approve return.',
-      );
-
-  String get fieldReturnsOrderNotFound => _t(
-        'تعذّر العثور على البيع الأصلي على الخادم. '
-        'تأكد أن المبيعة مُرسلة ومعتمدة من «طلبات الميدان» قبل اعتماد المرتجع.',
-        'Could not find the original sale on the server. '
-        'Ensure the sale was sent and approved from field orders before approving the return.',
-      );
-
-  String get fieldReturnsOrderNotApproved => _t(
-        'يجب اعتماد البيع الأصلي قبل اعتماد المرتجع.',
-        'The original sale must be approved before approving the return.',
-      );
-
-  String fieldReturnsRemoteApproveFailed(String detail) => _t(
-        'تعذّر اعتماد المرتجع على الخادم: $detail',
-        'Could not approve the return on the server: $detail',
-      );
-
-  String fieldReturnsApproveFailedDetail(String detail) => _t(
-        'تعذّر اعتماد المرتجع: $detail',
-        'Could not approve the return: $detail',
-      );
-
-  String get fieldReturnsLocalReturnFailed => _t(
-        'تعذّر تسجيل المرتجع محلياً.',
-        'Could not record the return locally.',
-      );
-
-  String get distributorHubTitle => _t('التوزيع الميداني', 'Field distribution');
-
-  String get distributorsHubPublishAction => _t('نشر الآن', 'Publish now');
-
-  String get distributorsHubHeroBadge => _t(
-        'سيارات التوزيع والميدان',
-        'Delivery trucks & field sales',
-      );
-
-  String get distributorsHubHeroTitle => _t(
-        'مركز إدارة موزّعي البضاعة',
-        'Field distributor control center',
-      );
-
-  String get distributorsHubHeroBody => _t(
-        'هذه الصفحة مخصّصة لموزّعي البضاعة على سيارات التوزيع. يُصدر الموزّع الفواتير والطلبات من هاتفه المحمول، بينما يتصل برنامج الحاسوب بخادم المزامنة لمتابعة السيارات، تحميل المخزون، اعتماد المبيعات، واستخراج التقارير.',
-        'This page is for distributors on delivery vehicles. The distributor issues invoices and orders from a mobile phone, while the desktop app connects to the sync server to manage vehicles, load stock, approve sales, and run reports.',
-      );
-
-  String get distributorsHubInternetNoticeTitle => _t(
-        'تنبيه — يتطلب اتصالاً بالإنترنت',
-        'Notice — internet connection required',
-      );
-
-  String get distributorsHubInternetNoticeBody => _t(
-        'تعتمد خدمة الموزعين على إنترنت فعّال لربط نسخة الحاسوب بتطبيق الجوال لدى الموزّعين في الميدان. '
-        'بدون اتصال لا تُزامَن المخزونات، ولا تصل مبيعات الميدان، ولا تُحدَّث بيانات السيارات.',
-        'The distributors service needs an active internet connection to link the desktop app with distributors’ mobile apps in the field. '
-        'Without connectivity, inventory will not sync, field sales will not arrive, and vehicle data will not update.',
-      );
-
-  String get distributorsHubSyncTitle => _t(
-        'الربط بين الحاسوب والجوال',
-        'Desktop ↔ mobile connection',
-      );
-
-  String get distributorsHubSyncHint => _t(
-        'البيانات تتدفق عبر الإنترنت بين نقطة التحكم على الحاسوب وتطبيق الموزّع على الهاتف: المخزون، مخزون السيارة، والطلبات الواردة من الميدان.',
-        'Data flows over the internet between the desktop control point and the distributor phone app: inventory, truck stock, and field orders.',
-      );
-
-  String get distributorsHubSyncDesktop => _t('الحاسوب', 'Desktop');
-  String get distributorsHubSyncServer => _t('خادم المزامنة', 'Sync server');
-  String get distributorsHubSyncMobile => _t('هاتف الموزّع', 'Distributor phone');
-
-  String get distributorsHubSyncDesktopCaption => _t(
-        'تحميل السيارة، الاعتماد، التقارير',
-        'Load trucks, approve, reports',
-      );
-
-  String get distributorsHubSyncServerCaption => _t(
-        'نشر المخزون ومزامنة البيانات',
-        'Inventory publish & data sync',
-      );
-
-  String get distributorsHubSyncMobileCaption => _t(
-        'فواتير وطلبات من الميدان',
-        'Invoices & orders from the field',
-      );
-
-  String get distributorsHubWorkflowPublish => _t(
-        '١ نشر المخزون للجوال',
-        '1 Publish inventory to phone',
-      );
-
-  String get distributorsHubWorkflowLoad => _t(
-        '٢ تحميل السيارة',
-        '2 Load the truck',
-      );
-
-  String get distributorsHubWorkflowSell => _t(
-        '٣ بيع من الهاتف',
-        '3 Sell from phone',
-      );
-
-  String get distributorsHubWorkflowApprove => _t(
-        '٤ اعتماد على الحاسوب',
-        '4 Approve on desktop',
-      );
-
-  String get distributorsHubSectionOperations => _t(
-        'العمليات اليومية',
-        'Daily operations',
-      );
-
-  String get distributorsHubSectionOperationsSub => _t(
-        'إدارة الطلبات، السيارات، والمزامنة مع الجوال',
-        'Orders, vehicles, and mobile sync',
-      );
-
-  String get distributorsHubSectionReports => _t('التقارير', 'Reports');
-
-  String get distributorsHubReportsDropdownHint =>
-      _t('اختر تقريراً', 'Select a report');
-
-  String get distributorsHubSectionReportsSub => _t(
-        'معاينة وطباعة وتصدير PDF',
-        'Preview, print, and PDF export',
-      );
-
-  String get distributorsHubStatDistributors => _t('موزّعون', 'Distributors');
-
-  String get distributorsHubStatPending => _t(
-        'طلبات بانتظار الاعتماد',
-        'Pending approval',
-      );
-
-  String get distributorsHubStatMovements => _t(
-        'حركات مسجّلة',
-        'Recorded movements',
-      );
-
-  String get distributorsHubNotesTitle => _t('ملاحظات', 'Notes');
-
-  String get distributorsHubNotesDesc => _t(
-        'ملاحظات خاصة بمنظومة الموزعين — منفصلة عن مفكرة الصفحة الرئيسية',
-        'Notes for the distributors hub only — separate from the home notepad',
-      );
-
-  String get distributorsHubNotesHint => _t(
-        'ملاحظات التوزيع، الموزّعين، الطلبات الميدانية…',
-        'Distribution notes, distributors, field orders…',
-      );
-
-  String get distributorsHubNotesSaved =>
-      _t('تم حفظ ملاحظات الموزعين.', 'Distributor notes saved.');
-
-  String get distributorsHubConnectionTitle =>
-      _t('حالة الربط', 'Connection status');
-
-  String get distributorsHubConnectionOk => _t(
-        'الربط جاهز — الكتالوج منشور للجوال',
-        'Link ready — catalog published to mobile',
-      );
-
-  String get distributorsHubConnectionWarning => _t(
-        'تحقق من الإعدادات أو انشر الكتالوج للجوال',
-        'Check settings or publish the catalog to mobile',
-      );
-
-  String get distributorsHubConnectionOffline => _t(
-        'خادم المزامنة غير مفعّل',
-        'Sync server is not enabled',
-      );
-
-  String distributorsHubLastPublish(String when, int products) => _t(
-        'آخر نشر: $when — $products صنف',
-        'Last publish: $when — $products products',
-      );
-
-  String get distributorsHubNeverPublished => _t(
-        'لم يُنشر الكتالوج بعد',
-        'Catalog not published yet',
-      );
-
-  String get distributorsHubTodayActivity =>
-      _t('نشاط اليوم', 'Today\'s activity');
-
-  String get distributorsHubTodayActivityEmpty => _t(
-        'لا حركات مسجّلة اليوم',
-        'No movements recorded today',
-      );
-
-  String get distributorsHubViewAllMovements =>
-      _t('كل الحركات', 'All movements');
-
-  String get fieldOrdersLoadTruckAction => _t(
-        'تحميل إضافي',
-        'Extra load',
-      );
-
-  String get distributorTruckLoadTotalValue =>
-      _t('قيمة التحميل', 'Load value');
-
-  String get distributorTruckLoadCopyLastLoad => _t(
-        'نسخ آخر تحميل',
-        'Copy last load',
-      );
-
-  String get distributorTruckLoadTemplates => _t(
-        'قوالب التحميل',
-        'Load templates',
-      );
-
-  String get distributorTruckLoadSaveTemplate => _t(
-        'حفظ كقالب',
-        'Save as template',
-      );
-
-  String get distributorTruckLoadTemplateName => _t(
-        'اسم القالب',
-        'Template name',
-      );
-
-  String get distributorTruckLoadTemplateSaved => _t(
-        'تم حفظ القالب.',
-        'Template saved.',
-      );
-
-  String get distributorTruckLoadTemplateApplied => _t(
-        'تم تطبيق القالب.',
-        'Template applied.',
-      );
-
-  String get distributorTruckLoadLastLoadApplied => _t(
-        'تم نسخ آخر تحميل.',
-        'Last load copied.',
-      );
-
-  String get distributorTruckLoadNoLastLoad => _t(
-        'لا يوجد تحميل سابق لهذا الموزّع.',
-        'No previous load for this distributor.',
-      );
-
-  String get distributorTruckLoadNoTemplates => _t(
-        'لا توجد قوالب محفوظة.',
-        'No saved templates.',
-      );
-
-  String distributorTruckLoadTemplateMeta(int lines, String qty) => _t(
-        '$lines صنف · $qty',
-        '$lines items · $qty',
-      );
-
-  String get fieldOrdersBatchMode => _t('تحديد متعدد', 'Multi-select');
-
-  String get fieldOrdersSelectAll => _t('تحديد الكل', 'Select all');
-
-  String get fieldOrdersClearSelection => _t('إلغاء التحديد', 'Clear selection');
-
-  String fieldOrdersBatchApprove(int count) => _t(
-        'اعتماد ($count)',
-        'Approve ($count)',
-      );
-
-  String fieldOrdersBatchReject(int count) => _t(
-        'رفض ($count)',
-        'Reject ($count)',
-      );
-
-  String fieldOrdersBatchApproveDone(int ok, int failed) => _t(
-        'تم اعتماد $ok — فشل $failed',
-        'Approved $ok — failed $failed',
-      );
-
-  String fieldOrdersBatchRejectDone(int ok, int failed) => _t(
-        'تم رفض $ok — فشل $failed',
-        'Rejected $ok — failed $failed',
-      );
-
-  String get distributorsHubReportVarianceTitle => _t(
-        'فروقات السيارات',
-        'Truck variances',
-      );
-
-  String get distributorsHubReportVarianceDesc => _t(
-        'مقارنة ما حُمّل وما بيع وما تبقى على السيارة',
-        'Compare loaded, sold, and remaining on truck',
-      );
-
-  String get distributorReportColExpected => _t('المتوقع', 'Expected');
-
-  String get distributorReportColVariance => _t('الفرق', 'Variance');
-
-  String get distributorReportVariancesIssuesOnly =>
-      _t('فروقات فقط', 'Issues only');
-
-  String get distributorReportColCleared => _t('تفريغ', 'Cleared');
-
-  String get distributorsHubLoadDesc => _t(
-        'نقل أصناف من المستودع إلى سيارة الموزّع',
-        'Move items from warehouse to distributor truck',
-      );
-
-  String get distributorsHubFieldOrdersDesc => _t(
-        'اعتماد طلبات المبيعات الواردة من الميدان',
-        'Approve sales orders from the field',
-      );
-
-  String get distributorsHubMovementsDesc => _t(
-        'سجل تحميل وبيع وإرجاع بضاعة السيارة',
-        'Truck load, sale, and return log',
-      );
-
-  String get distributorsHubPublishDesc => _t(
-        'نشر المنتجات والعملاء لتطبيق الموزّع',
-        'Publish products and customers to the distributor app',
-      );
-
-  String get distributorsHubFieldExpensesDesc => _t(
-        'اعتماد مصروفات الموزّعين من الميدان',
-        'Approve distributor field expenses',
-      );
-
-  String get distributorsHubReturnsEmptyTruckDesc => _t(
-        'اختر أصنافاً محمّلة على السيارة وأعدها للمستودع',
-        'Select loaded truck items and return them to warehouse',
-      );
-
-  String get distributorsHubReportMovementsTitle => _t(
-        'تقرير حركات السيارات',
-        'Truck movements report',
-      );
-
-  String get distributorsHubReportMovementsDesc => _t(
-        'سجل تحميل وبيع وإرجاع بضاعة كل موزّع مع معاينة وطباعة',
-        'Load, sale, and return log per distributor with preview and print',
-      );
-
-  String get distributorsHubReportSummaryTitle => _t(
-        'ملخص أداء الموزّعين',
-        'Distributor performance summary',
-      );
-
-  String get distributorsHubReportSummaryDesc => _t(
-        'إجمالي التحميل والبيع والإرجاع لكل موزّع',
-        'Total load, sale, and return per distributor',
-      );
-
-  String get distributorsHubReportTruckStockTitle => _t(
-        'بضاعة على السيارات',
-        'Stock on trucks',
-      );
-
-  String get distributorsHubReportTruckStockDesc => _t(
-        'الأصناف الحالية على سيارة كل موزّع',
-        'Current items on each distributor truck',
-      );
-
-  String get distributorsHubReportFieldExpensesTitle => _t(
-        'مصروفات الميدان',
-        'Field expenses',
-      );
-
-  String get distributorsHubReportFieldExpensesDesc => _t(
-        'مصروفات الموزّعين المرسلة من الميدان',
-        'Distributor expenses submitted from the field',
-      );
-
-  String get distributorsHubReportFieldReturnsTitle => _t(
-        'مرتجعات الميدان',
-        'Field returns',
-      );
-
-  String get distributorsHubReportFieldReturnsDesc => _t(
-        'مرتجعات العملاء المرسلة من موزّعي الميدان',
-        'Customer returns submitted by field distributors',
-      );
-
-  String get distributorReportPreviewPdf => _t('معاينة PDF', 'Preview PDF');
-
-  String get distributorReportPrint => _t('طباعة', 'Print');
-
-  String get distributorReportFilterDistributor =>
-      _t('تصفية بالموزّع', 'Filter by distributor');
-
-  String get distributorReportColDistributor => _t('الموزّع', 'Distributor');
-
-  String get distributorReportColProduct => _t('الصنف', 'Product');
-
-  String get distributorReportColType => _t('نوع الحركة', 'Movement type');
-
-  String get distributorReportColQty => _t('الكمية', 'Quantity');
-
-  String get distributorReportColDate => _t('التاريخ', 'Date');
-
-  String get distributorReportColLoads => _t('تحميل', 'Loaded');
-
-  String get distributorReportColSales => _t('بيع', 'Sold');
-
-  String get distributorReportColReturns => _t('إرجاع', 'Returned');
-
-  String get distributorReportColOnTruck => _t('على السيارة', 'On truck');
-
-  String get distributorReportColMovements => _t('عدد الحركات', 'Movements');
-
-  String get distributorReportColSalePrice => _t('سعر البيع', 'Sale price');
-
-  String get distributorReportColUnit => _t('الوحدة', 'Unit');
-
-  String get distributorReportColAmount => _t('المبلغ', 'Amount');
-
-  String get distributorReportColStatus => _t('الحالة', 'Status');
-
-  String get distributorReportColTitle => _t('العنوان', 'Title');
-
-  String get distributorReportColPayment => _t('طريقة الدفع', 'Payment');
-
-  String get distributorReportColNotes => _t('ملاحظات', 'Notes');
-
-  String get distributorReportFilterStatus => _t('الحالة', 'Status');
-
-  String get distributorReportStatusAll => _t('الكل', 'All');
-
-  String get distributorReportStatusPending =>
-      _t('بانتظار الاعتماد', 'Pending');
-
-  String get distributorReportStatusApproved => _t('معتمد', 'Approved');
-
-  String get distributorReportStatusRejected => _t('مرفوض', 'Rejected');
-
-  String distributorReportExpensesTotal(String amount) => _t(
-        'إجمالي المصروفات: $amount',
-        'Total expenses: $amount',
-      );
-
-  String distributorReportReturnsTotal(String amount, int count) => _t(
-        'إجمالي المرتجعات: $amount · $count فاتورة',
-        'Total returns: $amount · $count invoices',
-      );
-
-  String get distributorReportFieldExpensesEmpty => _t(
-        'لا مصروفات مطابقة للتصفية.',
-        'No expenses match the filter.',
-      );
-
-  String get distributorReportFieldReturnsEmpty => _t(
-        'لا مرتجعات مطابقة للتصفية.',
-        'No returns match the filter.',
-      );
-
-  String get distributorReportFieldDataUnavailable => _t(
-        'تعذّر تحميل البيانات — تحقق من إعدادات خادم التفعيل.',
-        'Could not load data — check activation server settings.',
-      );
-
-
-  String get menuLoadDistributorTruck => _t(
-        'تحميل سيارة موزّع',
-        'Load distributor truck',
-      );
-
-  String get distributorTruckLoadTitle =>
-      _t('تحميل سيارة الموزّع', 'Load distributor truck');
-
-  String get distributorTruckLoadIntro => _t(
-        'اختر الموزّع وأدخل الكميات لنقلها من المستودع إلى السيارة. سيتم خصمها من مخزون الفرع ونشرها للجوال.',
-        'Pick a distributor and enter quantities to move from the warehouse to the truck. Branch stock is reduced and synced to mobile.',
-      );
-
-  String get distributorTruckLoadSearchHint => _t(
-        'ابحث بالاسم أو الباركود لإضافة أصناف',
-        'Search by name or barcode to add items',
-      );
-
-  String get distributorTruckLoadCategoryAll =>
-      _t('كل التصنيفات', 'All categories');
-
-  String get distributorTruckLoadTableEmpty => _t(
-        'ابحث عن صنف أو اختر من المنتجات لإضافته إلى فاتورة التحميل',
-        'Search or pick products to add to the load invoice',
-      );
-
-  String get distributorTruckLoadInvoiceTitle => _t(
-        'فاتورة تحميل السيارة',
-        'Truck load invoice',
-      );
-
-  String get distributorTruckLoadNewInvoice => _t(
-        'فاتورة جديدة',
-        'New invoice',
-      );
-
-  String get distributorTruckLoadShowProducts => _t(
-        'عرض المنتجات',
-        'Browse products',
-      );
-
-  String get distributorTruckLoadConfirmTitle => _t(
-        'اعتماد تحميل السيارة',
-        'Confirm truck load',
-      );
-
-  String get distributorTruckLoadProductsPanel => _t('المنتجات', 'Products');
-
-  String get distributorTruckLoadSelectedPanel =>
-      _t('المختارة للتحميل', 'Selected for load');
-
-  String get distributorTruckLoadPreviewInvoice =>
-      _t('معاينة فاتورة الموزّع', 'Preview distributor invoice');
-
-  String get distributorTruckLoadPreviewPrintInvoice => _t(
-        'معاينة فاتورة الموزّع وطباعتها',
-        'Preview and print distributor invoice',
-      );
-
-  String get distributorTruckLoadPrintInvoice =>
-      _t('طباعة فاتورة الموزّع', 'Print distributor invoice');
-
-  String distributorTruckLoadConfirmBody(String distributor) => _t(
-        'اعتماد فاتورة التحميل للموزّع «$distributor» ونشرها على الجوال؟',
-        'Confirm the load invoice for «$distributor» and publish to mobile?',
-      );
-
-  String distributorTruckOnBoardSummary(int count, String qtyLabel) => _t(
-        'على السيارة: $count صنف · $qtyLabel',
-        'On truck: $count items · $qtyLabel',
-      );
-
-  String get distributorTruckLoadColStock => _t('المستودع', 'Warehouse');
-
-  String get distributorTruckLoadColOnTruck => _t('السيارة', 'Truck');
-
-  String get distributorTruckLoadPickDistributor =>
-      _t('الموزّع', 'Distributor');
-
-  String get distributorTruckLoadAddQty =>
-      _t('كميات الإضافة للسيارة', 'Quantities to add to truck');
-
-  String get distributorTruckLoadQtyLabel => _t('إضافة', 'Add');
-
-  String get distributorTruckLoadSubmit =>
-      _t('تحميل ونشر', 'Load and publish');
-
-  String get distributorTruckLoadNoQty => _t(
-        'أدخل كمية واحدة على الأقل.',
-        'Enter at least one quantity.',
-      );
-
-  String get distributorTruckLoadOk => _t(
-        'تم تحميل السيارة ونشرها للموزّع.',
-        'Truck loaded and published to the distributor.',
-      );
-
-  String distributorTruckLoadInsufficient(String product) => _t(
-        'مخزون غير كافٍ: $product',
-        'Insufficient stock: $product',
-      );
-
-  String distributorTruckCurrentQty(double qty) => _t(
-        'على السيارة: $qty',
-        'On truck: $qty',
-      );
-
-  String get distributorTruckDeductFromWarehouse => _t(
-        'خصم من المستودع',
-        'Deduct from warehouse',
-      );
-
-  String get distributorTruckDeductFromWarehouseHint => _t(
-        'عند التفعيل تُنقَل الكمية من مخزون الفرع. عند الإيقاف تُعيَّن على السيارة فقط.',
-        'When on, quantity moves from branch stock. When off, it is assigned to the truck only.',
-      );
-
-  String get distributorTruckAssignQty =>
-      _t('كميات التعيين على السيارة', 'Quantities to assign on truck');
-
-  String get distributorTruckAssignSubmit =>
-      _t('تعيين ونشر', 'Assign and publish');
-
-  String get distributorTruckAssignOk => _t(
-        'تم تعيين الكميات على السيارة ونشرها.',
-        'Quantities assigned on the truck and published.',
-      );
-
-  String get distributorTruckOnBoardTitle =>
-      _t('البضاعة الحالية على السيارة', 'Current truck inventory');
-
-  String get distributorTruckOnBoardEmpty => _t(
-        'لا توجد أصناف محمّلة على سيارة هذا الموزّع.',
-        'No items loaded on this distributor\'s truck.',
-      );
-
-  String get distributorTruckAddQtyLabel =>
-      _t('إضافة', 'Add');
-
-  String get distributorTruckEmptyAction =>
-      _t('تفريغ السيارة', 'Empty truck');
-
-  String get distributorTruckEmptyTitle =>
-      _t('تفريغ السيارة', 'Empty truck');
-
-  String distributorTruckEmptyConfirm(String distributor) => _t(
-        'تفريغ سيارة «$distributor»؟ اختر إرجاع البضاعة للمستودع أو التفريغ فقط.',
-        'Empty truck for «$distributor»? Return stock to warehouse or clear only.',
-      );
-
-  String get distributorTruckEmptyReturnWarehouse =>
-      _t('إرجاع للمستودع', 'Return to warehouse');
-
-  String get distributorTruckEmptyClearOnly =>
-      _t('تفريغ فقط', 'Clear only');
-
-  String get distributorTruckEmptyReturnedOk => _t(
-        'تم إرجاع بضاعة السيارة للمستودع.',
-        'Truck stock returned to the warehouse.',
-      );
-
-  String get distributorTruckEmptyClearedOk => _t(
-        'تم تفريغ السيارة.',
-        'Truck emptied.',
-      );
-
-  String get distributorTruckAlreadyEmpty => _t(
-        'السيارة فارغة بالفعل.',
-        'Truck is already empty.',
-      );
-
-  String get distributorTruckUnloadItemsPanel => _t(
-        'أصناف محمّلة على السيارة',
-        'Items loaded on truck',
-      );
-
-  String get distributorTruckUnloadSelectAll =>
-      _t('تحديد الكل', 'Select all');
-
-  String get distributorTruckUnloadClearSelection =>
-      _t('مسح التحديد', 'Clear selection');
-
-  String get distributorTruckUnloadMax =>
-      _t('الحد الأقصى', 'Maximum');
-
-  String get distributorTruckUnloadNoQty => _t(
-        'اختر كمية واحدة على الأقل للإرجاع.',
-        'Select at least one quantity to return.',
-      );
-
-  String get distributorTruckUnloadSubmit =>
-      _t('إرجاع للمستودع', 'Return to warehouse');
-
-  String get distributorTruckUnloadConfirmTitle => _t(
-        'تأكيد إرجاع من السيارة',
-        'Confirm truck unload',
-      );
-
-  String distributorTruckUnloadConfirmBody(String distributor) => _t(
-        'إرجاع الأصناف المحددة من سيارة «$distributor».',
-        'Return selected items from truck «$distributor».',
-      );
-
-  String get distributorTruckUnloadReturnHint => _t(
-        'عند التفعيل تُضاف الكميات إلى مخزون الفرع وتُخصم من سيارة الموزّع.',
-        'When on, quantities are added to branch stock and deducted from the distributor truck.',
-      );
-
-  String get distributorTruckUnloadReturnedOk => _t(
-        'تم إرجاع الأصناف للمستودع وخصمها من السيارة.',
-        'Items returned to warehouse and deducted from truck.',
-      );
-
-  String distributorTruckUnloadInsufficient(String product) => _t(
-        'الكمية تتجاوز الموجود على السيارة: $product',
-        'Quantity exceeds truck stock: $product',
-      );
-
-  String get distributorTruckUnloadFailed => _t(
-        'تعذّر إرجاع الأصناف من السيارة.',
-        'Could not unload items from truck.',
-      );
-
-
-  String fieldReturnsLineCount(int count) => _t(
-        '$count صنف',
-        '$count items',
-      );
-
-  String get distributorTruckMovementsTitle =>
-      _t('حركة السيارة', 'Truck movements');
-
-  String get distributorTruckMovementsAll =>
-      _t('كل الموزّعين', 'All distributors');
-
-  String get distributorTruckMovementsEmpty => _t(
-        'لا حركات مسجّلة.',
-        'No movements recorded.',
-      );
-
-  String distributorTruckMovementsShowing(int shown, int total) => _t(
-        'عرض $shown من $total حركة',
-        'Showing $shown of $total movements',
-      );
-
-  String get distributorTruckMovementsLoadMore =>
-      _t('تحميل المزيد', 'Load more');
-
-  String get distributorTruckMovementsFilterType =>
-      _t('نوع الحركة', 'Movement type');
-
-  String get distributorTruckMovementsFilterPeriod => _t('الفترة', 'Period');
-
-  String get distributorTruckMovementsPeriod7d => _t('٧ أيام', '7 days');
-
-  String get distributorTruckMovementsPeriod30d => _t('٣٠ يوماً', '30 days');
-
-  String get distributorTruckMovementsPeriod90d => _t('٩٠ يوماً', '90 days');
-
-  String get distributorTruckMovementsPeriodAll => _t('الكل', 'All');
-
-  String get distributorTruckMovementsSearchProduct =>
-      _t('بحث بالصنف', 'Search product');
-
-  String get distributorTruckMovementsAllTypes =>
-      _t('كل الأنواع', 'All types');
-
-  String get distributorTruckMovementsLargeDataHint => _t(
-        'عند وجود آلاف الحركات، استخدم التصفية أعلاه أو تقرير «حركات السيارات» من صفحة الموزعون لتصدير السجل الكامل.',
-        'With thousands of movements, use the filters above or the vehicle movements report on the Distributors page for a full export.',
-      );
-
-  String get distributorTruckMovementLoad =>
-      _t('تحميل من المستودع', 'Load from warehouse');
-
-  String get distributorTruckMovementAssign =>
-      _t('تعيين بدون خصم', 'Assign (no deduct)');
-
-  String get distributorTruckMovementSale =>
-      _t('بيع معتمد', 'Approved sale');
-
-  String get distributorTruckMovementReturn =>
-      _t('إرجاع للمستودع', 'Return to warehouse');
-
-  String get distributorTruckMovementClear =>
-      _t('تفريغ', 'Clear');
-
-  String get menuDistributorTruckMovements => _t(
-        'حركة سيارات الموزّعين',
-        'Distributor truck movements',
-      );
-
-  String distributorStockAvailable(double qty) => _t(
-        'المخزون: $qty',
-        'Stock: $qty',
-      );
-
-
-
-
-
 
   String get distributorHubIntro => _t(
         'أنشئ طلبات العملاء؛ يراجعها المكتب على الحاسوب قبل تسجيل الفاتورة.',
@@ -4485,30 +3430,6 @@ class AppLocalizations {
   String get distributorNewSale => _t('بيع جديد', 'New sale');
 
   String get distributorMySales => _t('مبيعاتي', 'My sales');
-
-  String get distributorComposeSaleTitle => _t('فاتورة بيع', 'Sales invoice');
-
-  String get distributorSubmitSale => _t('إتمام البيع', 'Complete sale');
-
-  String get distributorSaleSent => _t(
-        'تم إرسال الفاتورة للمراجعة.',
-        'Invoice sent for review.',
-      );
-
-  String get distributorPaymentMethod => _t('طريقة الدفع', 'Payment method');
-
-  String get distributorPaidAmount => _t('المبلغ المدفوع', 'Amount paid');
-
-  String get distributorDiscount => _t('خصم', 'Discount');
-
-  String get distributorGrandTotal => _t('الإجمالي', 'Grand total');
-
-  String get distributorRemainingDeferred => _t('المتبقي (آجل)', 'Balance (deferred)');
-
-  String distributorHubWelcome(String name) => _t(
-        'الموزّع: $name',
-        'Distributor: $name',
-      );
 
   String get distributorExitToMainApp => _t(
         'العودة للتطبيق الرئيسي',
@@ -4543,6 +3464,30 @@ class AppLocalizations {
         'Approved or rejected sales cannot be edited or deleted.',
       );
 
+  String get distributorComposeSaleTitle => _t('فاتورة بيع', 'Sales invoice');
+
+  String get distributorSubmitSale => _t('إتمام البيع', 'Complete sale');
+
+  String get distributorSaleSent => _t(
+        'تم إرسال الفاتورة للمراجعة.',
+        'Invoice sent for review.',
+      );
+
+  String distributorStockAvailable(double qty) => _t(
+        'المخزون: $qty',
+        'Stock: $qty',
+      );
+
+  String get distributorPaymentMethod => _t('طريقة الدفع', 'Payment method');
+
+  String get distributorPaidAmount => _t('المبلغ المدفوع', 'Amount paid');
+
+  String get distributorDiscount => _t('خصم', 'Discount');
+
+  String get distributorGrandTotal => _t('الإجمالي', 'Grand total');
+
+  String get distributorRemainingDeferred => _t('المتبقي (آجل)', 'Balance (deferred)');
+
   String get distributorPrintSale => _t('طباعة الفاتورة', 'Print invoice');
 
   String get distributorShareSale => _t('مشاركة الفاتورة', 'Share invoice');
@@ -4572,6 +3517,11 @@ class AppLocalizations {
   String get distributorInsufficientMainStock => _t(
         'الكمية تتجاوز المخزون المتاح.',
         'Quantity exceeds available stock.',
+      );
+
+  String distributorHubWelcome(String name) => _t(
+        'الموزّع: $name',
+        'Distributor: $name',
       );
 
   String get distributorCatalogEmptyHint => _t(
@@ -4861,7 +3811,11 @@ class AppLocalizations {
 
   String get fieldOrderStatusRejected => _t('مرفوض', 'Rejected');
 
+  String fieldOrdersLineCount(int n) =>
+      _t('$n بند', n == 1 ? '1 line' : '$n lines');
 
+  String fieldOrdersTotal(String amount) =>
+      _t('الإجمالي: $amount', 'Total: $amount');
 
   String distributorRejectReason(String reason) =>
       _t('سبب الرفض: $reason', 'Rejection reason: $reason');
@@ -4886,7 +3840,15 @@ class AppLocalizations {
 
   String get distributorScanBarcode => _t('مسح باركود', 'Scan barcode');
 
+  String fieldOrdersProductNotFound(String name) => _t(
+        'الصنف غير موجود محلياً: $name',
+        'Product not found locally: $name',
+      );
 
+  String get fieldOrdersUnavailable => _t(
+        'تعذّر الإرسال: تحقق من تفعيل الجهاز وبريد اشتراك المالك في الإعدادات.',
+        'Cannot send: verify device activation and owner subscription e-mail in settings.',
+      );
 
   String get distributorCloudRequired => _t(
         'يتطلب اشتراك سحابة الموزّعين (\$50/سنة). '
@@ -4902,14 +3864,14 @@ class AppLocalizations {
 
   String get distributorTrialBanner => _t(
         'وضع التجربة: يمكنك تحميل حتى 5 منتجات وإرسال 3 مصروفات ميدانية. '
-        'فعّل اشتراك MizaPos أو سحابة الموزّعين لاستخدام المنظومة بالكامل.',
+        'فعّل اشتراك سحابة الموزّعين (\$50/سنة) لاستخدام المنظومة بالكامل.',
         'Trial mode: load up to 5 products and send 3 field expenses. '
-        'Activate MizaPos or distributor cloud for full access.',
+        'Enable distributor cloud (\$50/year) for full access.',
       );
 
   String distributorTrialProductLimit(int limit) => _t(
-        'حد التجربة: $limit منتجات كحد أقصى للتحميل. فعّل الاشتراك لرفع الحد.',
-        'Trial limit: $limit products max to load. Activate subscription to lift the limit.',
+        'حد التجربة: $limit منتجات كحد أقصى للتحميل. فعّل سحابة الموزّعين لرفع الحد.',
+        'Trial limit: $limit products max to load. Enable distributor cloud to lift the limit.',
       );
 
   String distributorTrialExpenseLimit(int limit) => _t(
@@ -4944,11 +3906,6 @@ class AppLocalizations {
 
   String get distributorModeLocal => _t('موزّع محلي', 'Local distributor');
 
-  String get distributorCloudOnlyForFieldHub => _t(
-        'التوزيع الميداني والشاحنة للموزّعين السحابة فقط — اختر موزّعاً مفعّلاً بالسحابة.',
-        'Field distribution and truck load are for cloud distributors only — pick a cloud-enabled distributor.',
-      );
-
   String get distributorModeCloud => _t('موزّع سحابة', 'Cloud distributor');
 
   String get distributorModeLocalHint => _t(
@@ -4976,8 +3933,17 @@ class AppLocalizations {
         'Saved locally — cloud sync is for cloud distributors only.',
       );
 
+  String get fieldOrdersOffline => _t(
+        'تعذر الاتصال بالخادم. تحقق من الإنترنت وحاول مجدداً.',
+        'Could not reach the server. Check your connection and try again.',
+      );
 
+  String get fieldOrdersRefresh => _t('تحديث', 'Refresh');
 
+  String get fieldOrdersEmpty => _t(
+        'لا توجد طلبات معلّقة من الموزّعين.',
+        'No pending distributor orders.',
+      );
 
   String get distributorSalesFilterStatus => _t('الحالة', 'Status');
 
@@ -5224,7 +4190,7 @@ class AppLocalizations {
   String get txHideProductBrowsePanel =>
       _t('إخفاء المنتجات', 'Hide products panel');
   String get txShowProductBrowsePanel =>
-      _t('عرض المنتجات', 'Show products');
+      _t('عرض المنتجات', 'Show products panel');
 
   String get txProductBrowseGridView => _t(
         'عرض شبكة الصور',

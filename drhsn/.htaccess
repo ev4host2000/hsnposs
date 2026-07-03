@@ -1,0 +1,37 @@
+# https://mizapos.com/drhsn — الملفات في جذر مجلد drhsn على الخادم
+DirectoryIndex index.php
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /drhsn/
+
+  # المسار الرسمي الوحيد لإدارة القسائم (إعادة توجيه المسارات القديمة)
+  RewriteRule ^$ public/vouchers.html [R=302,L]
+  RewriteRule ^vouchers/?$ public/vouchers.html [R=302,L]
+  RewriteRule ^public/?$ public/vouchers.html [R=302,L]
+
+  # تمرير Authorization إلى PHP (Apache/CGI)
+  RewriteCond %{HTTP:Authorization} .
+  RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+  # ملفات ثابتة موجودة (public)
+  RewriteCond %{REQUEST_FILENAME} -f
+  RewriteRule ^ - [L]
+
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+
+  RewriteRule ^ index.php [L]
+</IfModule>
+
+<FilesMatch "^\.env$">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+</FilesMatch>
+
+<FilesMatch "\.(db|sqlite|sqlite3)$">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+</FilesMatch>

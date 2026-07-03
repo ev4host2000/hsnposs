@@ -3,6 +3,8 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:mizapos_desktop/l10n/app_localizations.dart';
 import 'package:mizapos_desktop/theme/app_design.dart';
+import 'package:mizapos_desktop/ui/desktop_responsive.dart';
+import 'package:mizapos_desktop/ui/layout_breakpoints.dart';
 
 typedef SessionRoleColors = ({Color bg, Color fg});
 
@@ -17,7 +19,7 @@ abstract final class SessionRolePalette {
       case 'accountant':
         return (bg: const Color(0xFFEDE9FE), fg: const Color(0xFF5B21B6));
       case 'distributor':
-        return (bg: const Color(0xFFFFE4E6), fg: const Color(0xFFBE123C));
+        return (bg: const Color(0xFFFFF7ED), fg: const Color(0xFFEA580C));
       case 'guest':
         return (bg: const Color(0xFFF1F5F9), fg: const Color(0xFF475569));
       default:
@@ -138,6 +140,7 @@ class SessionIdentityBar extends StatelessWidget {
     this.inlineRole = false,
     /// بدون إطار/خلفية (شريط ويندوز العلوي).
     this.borderless = false,
+    this.showRoleChip = true,
   });
 
   final String displayName;
@@ -149,6 +152,7 @@ class SessionIdentityBar extends StatelessWidget {
   final bool hideRole;
   final bool inlineRole;
   final bool borderless;
+  final bool showRoleChip;
 
   @override
   Widget build(BuildContext context) {
@@ -194,24 +198,27 @@ class SessionIdentityBar extends StatelessWidget {
           SizedBox(width: compact ? 5 : 7),
         ],
         if (borderless)
-          Flexible(
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Flexible(
-                  child: Text(
-                    name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: nameColor,
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w700,
-                      height: 1.1,
-                    ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: isDenseUiLayout(context) ? 132 : 168,
+                ),
+                child: Text(
+                  name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: nameColor,
+                    fontSize: isDenseUiLayout(context) ? 11 : 11.5,
+                    fontWeight: FontWeight.w700,
+                    height: 1.1,
                   ),
                 ),
-                const SizedBox(width: 8),
+              ),
+              if (showRoleChip) ...[
+                const SizedBox(width: 6),
                 SessionRoleChip(
                   role: role,
                   loc: loc,
@@ -219,11 +226,11 @@ class SessionIdentityBar extends StatelessWidget {
                   lightOnDark: lightOnDark,
                 ),
               ],
-            ),
+            ],
           )
         else
           Expanded(
-            child: hideRole
+            child: hideRole || !showRoleChip
                 ? Text(
                     name,
                     maxLines: 1,
@@ -252,14 +259,15 @@ class SessionIdentityBar extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(width: 6),
-                          Flexible(
-                            child: SessionRoleChip(
-                              role: role,
-                              loc: loc,
-                              compact: true,
-                              lightOnDark: lightOnDark,
+                          if (showRoleChip)
+                            Flexible(
+                              child: SessionRoleChip(
+                                role: role,
+                                loc: loc,
+                                compact: true,
+                                lightOnDark: lightOnDark,
+                              ),
                             ),
-                          ),
                         ],
                       )
                     : Column(
@@ -277,13 +285,15 @@ class SessionIdentityBar extends StatelessWidget {
                               height: 1.1,
                             ),
                           ),
-                          const SizedBox(height: 2),
-                          SessionRoleChip(
-                            role: role,
-                            loc: loc,
-                            compact: true,
-                            lightOnDark: lightOnDark,
-                          ),
+                          if (showRoleChip) ...[
+                            const SizedBox(height: 2),
+                            SessionRoleChip(
+                              role: role,
+                              loc: loc,
+                              compact: true,
+                              lightOnDark: lightOnDark,
+                            ),
+                          ],
                         ],
                       ),
           ),
@@ -450,9 +460,16 @@ Future<SessionIdentityPick?> showSessionIdentitySheet({
   required String role,
   required bool isStaffSignedIn,
   bool showSwitchAccount = true,
+  bool showRolePicker = true,
+  List<String>? rolePickerRoles,
+  /// واجهة مبسّطة لبوابة الموزّعين (جوال).
+  bool distributorPortalLayout = false,
 }) {
-  final mq = MediaQuery.sizeOf(context);
-  final maxW = math.min(460.0, mq.width - 20);
+  final roles = rolePickerRoles ?? SessionRolePalette.staffRoles;
+  final maxW = responsiveBottomSheetConstraints(
+    context,
+    designMaxWidth: 460,
+  ).maxWidth;
 
   return showModalBottomSheet<SessionIdentityPick>(
     context: context,
@@ -462,10 +479,7 @@ Future<SessionIdentityPick?> showSessionIdentitySheet({
       final scheme = Theme.of(sheetCtx).colorScheme;
       final name = displayName.trim().isEmpty ? '—' : displayName.trim();
       final colors = SessionRolePalette.colorsFor(role);
-      final initialRunes = name.runes;
-      final initial = initialRunes.isEmpty
-          ? '?'
-          : String.fromCharCode(initialRunes.first).toUpperCase();
+      const distributorAccent = Color(0xFFEA580C);
 
       Widget staffAction({
         required IconData icon,
@@ -509,6 +523,13 @@ Future<SessionIdentityPick?> showSessionIdentitySheet({
         );
       }
 
+      final compactSheet = isDenseUiLayout(sheetCtx);
+      final maxSheetH = responsiveBottomSheetConstraints(
+        sheetCtx,
+        designMaxWidth: 460,
+        heightFraction: 0.9,
+      ).maxHeight;
+
       return Padding(
         padding: EdgeInsets.only(
           left: 10,
@@ -518,7 +539,10 @@ Future<SessionIdentityPick?> showSessionIdentitySheet({
         child: Align(
           alignment: Alignment.bottomCenter,
           child: ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: maxW),
+            constraints: BoxConstraints(
+              maxWidth: maxW,
+              maxHeight: maxSheetH,
+            ),
             child: Material(
               color: scheme.surface,
               elevation: 16,
@@ -527,86 +551,177 @@ Future<SessionIdentityPick?> showSessionIdentitySheet({
               clipBehavior: Clip.antiAlias,
               child: SafeArea(
                 top: false,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const SizedBox(height: 10),
-                    Container(
-                      width: 44,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: scheme.outline.withValues(alpha: 0.28),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                    ),
-                    Container(
-                      width: double.infinity,
-                      margin: const EdgeInsets.fromLTRB(14, 14, 14, 0),
-                      padding: const EdgeInsets.fromLTRB(16, 18, 16, 16),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: AlignmentDirectional.topStart,
-                          end: AlignmentDirectional.bottomEnd,
-                          colors: [
-                            Color.lerp(colors.bg, colors.fg, 0.24)!,
-                            Color.lerp(colors.bg, colors.fg, 0.10)!,
-                          ],
-                        ),
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(
-                          color: colors.fg.withValues(alpha: 0.18),
-                        ),
-                      ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.center,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                    SizedBox(
+                      height: 44,
+                      child: Stack(
+                        alignment: Alignment.center,
                         children: [
-                          CircleAvatar(
-                            radius: 32,
-                            backgroundColor:
-                                scheme.surface.withValues(alpha: 0.72),
-                            child: Text(
-                              initial,
-                              style: TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.w800,
-                                color: colors.fg,
+                          Container(
+                            width: 44,
+                            height: 4,
+                            decoration: BoxDecoration(
+                              color: scheme.outline.withValues(alpha: 0.28),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                          ),
+                          Align(
+                            alignment: AlignmentDirectional.centerEnd,
+                            child: IconButton(
+                              tooltip: loc.close,
+                              visualDensity: VisualDensity.compact,
+                              onPressed: () => Navigator.of(sheetCtx).pop(),
+                              icon: Icon(
+                                Icons.close_rounded,
+                                color: scheme.onSurfaceVariant,
                               ),
                             ),
                           ),
-                          const SizedBox(height: 12),
-                          Text(
-                            isStaffSignedIn
-                                ? name
-                                : loc.sessionIdentityGuestPrompt,
-                            textAlign: TextAlign.center,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(sheetCtx)
-                                .textTheme
-                                .titleMedium
-                                ?.copyWith(fontWeight: FontWeight.w800),
-                          ),
-                          const SizedBox(height: 8),
-                          SessionRoleChip(role: role, loc: loc),
                         ],
                       ),
                     ),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(18, 14, 18, 0),
-                      child: Text(
-                        isStaffSignedIn
-                            ? (showSwitchAccount
-                                ? loc.sessionIdentitySwitchHint
-                                : loc.sessionIdentitySignOutOnlyHint)
-                            : loc.sessionIdentityPickRoleHint,
-                        textAlign: TextAlign.center,
-                        style: Theme.of(sheetCtx).textTheme.bodySmall?.copyWith(
-                              color: scheme.onSurfaceVariant,
-                              height: 1.4,
+                    if (distributorPortalLayout && !isStaffSignedIn) ...[
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(22, 20, 22, 0),
+                        child: Column(
+                          children: [
+                            Icon(
+                              Icons.local_shipping_rounded,
+                              size: 44,
+                              color: distributorAccent,
                             ),
+                            const SizedBox(height: 14),
+                            Text(
+                              loc.sessionIdentityDistributorPortalTitle,
+                              textAlign: TextAlign.center,
+                              style: Theme.of(sheetCtx)
+                                  .textTheme
+                                  .titleMedium
+                                  ?.copyWith(fontWeight: FontWeight.w800),
+                            ),
+                            const SizedBox(height: 10),
+                            Text(
+                              loc.sessionIdentityDistributorPortalBody,
+                              textAlign: TextAlign.center,
+                              style: Theme.of(sheetCtx)
+                                  .textTheme
+                                  .bodyMedium
+                                  ?.copyWith(
+                                    color: scheme.onSurfaceVariant,
+                                    height: 1.55,
+                                  ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
+                    ] else if (distributorPortalLayout && isStaffSignedIn) ...[
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
+                        child: Column(
+                          children: [
+                            Text(
+                              name,
+                              textAlign: TextAlign.center,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(sheetCtx)
+                                  .textTheme
+                                  .titleMedium
+                                  ?.copyWith(fontWeight: FontWeight.w800),
+                            ),
+                            const SizedBox(height: 8),
+                            SessionRoleChip(role: role, loc: loc),
+                          ],
+                        ),
+                      ),
+                    ] else ...[
+                      Container(
+                        width: double.infinity,
+                        margin: EdgeInsets.fromLTRB(14, compactSheet ? 8 : 14, 14, 0),
+                        padding: EdgeInsets.fromLTRB(
+                          16,
+                          compactSheet ? 12 : 18,
+                          16,
+                          compactSheet ? 12 : 16,
+                        ),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: AlignmentDirectional.topStart,
+                            end: AlignmentDirectional.bottomEnd,
+                            colors: [
+                              Color.lerp(colors.bg, colors.fg, 0.24)!,
+                              Color.lerp(colors.bg, colors.fg, 0.10)!,
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(
+                            color: colors.fg.withValues(alpha: 0.18),
+                          ),
+                        ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            CircleAvatar(
+                              radius: compactSheet ? 24 : 32,
+                              backgroundColor:
+                                  scheme.surface.withValues(alpha: 0.72),
+                              child: Text(
+                                name.runes.isEmpty
+                                    ? '?'
+                                    : String.fromCharCode(name.runes.first)
+                                        .toUpperCase(),
+                                style: TextStyle(
+                                  fontSize: compactSheet ? 18 : 24,
+                                  fontWeight: FontWeight.w800,
+                                  color: colors.fg,
+                                ),
+                              ),
+                            ),
+                            SizedBox(height: compactSheet ? 8 : 12),
+                            Text(
+                              isStaffSignedIn
+                                  ? name
+                                  : loc.sessionIdentityGuestPrompt,
+                              textAlign: TextAlign.center,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(sheetCtx)
+                                  .textTheme
+                                  .titleMedium
+                                  ?.copyWith(fontWeight: FontWeight.w800),
+                            ),
+                            const SizedBox(height: 8),
+                            SessionRoleChip(role: role, loc: loc),
+                          ],
+                        ),
+                      ),
+                    ],
+                    if (!distributorPortalLayout || isStaffSignedIn)
+                      Padding(
+                        padding: EdgeInsets.fromLTRB(
+                          18,
+                          compactSheet ? 8 : 14,
+                          18,
+                          0,
+                        ),
+                        child: Text(
+                          isStaffSignedIn
+                              ? (showSwitchAccount
+                                  ? loc.sessionIdentitySwitchHint
+                                  : loc.sessionIdentitySignOutOnlyHint)
+                              : loc.sessionIdentityPickRoleHint,
+                          textAlign: TextAlign.center,
+                          style:
+                              Theme.of(sheetCtx).textTheme.bodySmall?.copyWith(
+                                    color: scheme.onSurfaceVariant,
+                                    height: 1.4,
+                                  ),
+                        ),
+                      ),
                     if (isStaffSignedIn) ...[
                       const SizedBox(height: 14),
                       Padding(
@@ -638,41 +753,58 @@ Future<SessionIdentityPick?> showSessionIdentitySheet({
                       ),
                       const SizedBox(height: 6),
                     ],
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Text(
-                            loc.sessionIdentityRolesLegend,
-                            textAlign: TextAlign.center,
-                            style: Theme.of(sheetCtx)
-                                .textTheme
-                                .titleSmall
-                                ?.copyWith(fontWeight: FontWeight.w800),
-                          ),
-                          const SizedBox(height: 12),
-                          GridView.count(
-                            crossAxisCount: 2,
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            mainAxisSpacing: 10,
-                            crossAxisSpacing: 10,
-                            childAspectRatio: 1.15,
-                            children: [
-                              for (final r in SessionRolePalette.staffRoles)
-                                _RolePickTile(
-                                  role: r,
-                                  loc: loc,
-                                  onTap: () => Navigator.of(sheetCtx)
-                                      .pop(SessionIdentityPick.role(r)),
-                                ),
+                    if (showRolePicker && roles.isNotEmpty)
+                      Padding(
+                        padding: EdgeInsets.fromLTRB(
+                          16,
+                          distributorPortalLayout && !isStaffSignedIn
+                              ? 18
+                              : (compactSheet ? 10 : 16),
+                          16,
+                          compactSheet ? 12 : 18,
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            if (!distributorPortalLayout) ...[
+                              Text(
+                                loc.sessionIdentityRolesLegend,
+                                textAlign: TextAlign.center,
+                                style: Theme.of(sheetCtx)
+                                    .textTheme
+                                    .titleSmall
+                                    ?.copyWith(fontWeight: FontWeight.w800),
+                              ),
+                              SizedBox(height: compactSheet ? 8 : 12),
                             ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+                            GridView.count(
+                              crossAxisCount: roles.length == 1 ? 1 : 2,
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              mainAxisSpacing: compactSheet ? 8 : 10,
+                              crossAxisSpacing: compactSheet ? 8 : 10,
+                              childAspectRatio: roles.length == 1
+                                  ? 2.8
+                                  : (compactSheet ? 1.05 : 1.2),
+                              children: [
+                                for (final r in roles)
+                                  _RolePickTile(
+                                    role: r,
+                                    loc: loc,
+                                    compact: compactSheet,
+                                    plainIcon: distributorPortalLayout,
+                                    onTap: () => Navigator.of(sheetCtx)
+                                        .pop(SessionIdentityPick.role(r)),
+                                  ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      )
+                    else
+                      SizedBox(height: compactSheet ? 8 : 12),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -688,11 +820,15 @@ class _RolePickTile extends StatelessWidget {
     required this.role,
     required this.loc,
     required this.onTap,
+    this.compact = false,
+    this.plainIcon = false,
   });
 
   final String role;
   final AppLocalizations loc;
   final VoidCallback onTap;
+  final bool compact;
+  final bool plainIcon;
 
   @override
   Widget build(BuildContext context) {
@@ -724,56 +860,115 @@ class _RolePickTile extends StatelessWidget {
             ],
           ),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                CircleAvatar(
-                  radius: 24,
-                  backgroundColor: scheme.surface.withValues(alpha: 0.75),
-                  child: Icon(
-                    SessionRolePalette.iconFor(role),
-                    color: colors.fg,
-                    size: 28,
-                  ),
-                ),
-                const Spacer(),
-                Text(
-                  loc.securityRole(role),
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w800,
-                    color: colors.fg,
-                    height: 1.15,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      loc.settingsLoginCardTitle,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: colors.fg.withValues(alpha: 0.75),
-                      ),
-                    ),
-                    const SizedBox(width: 2),
-                    Icon(
-                      Icons.arrow_forward_rounded,
-                      size: 14,
-                      color: colors.fg.withValues(alpha: 0.75),
-                    ),
-                  ],
-                ),
-              ],
+            padding: EdgeInsets.symmetric(
+              horizontal: plainIcon ? 16 : (compact ? 8 : 10),
+              vertical: plainIcon ? 12 : (compact ? 8 : 12),
             ),
+            child: plainIcon
+                ? Row(
+                    children: [
+                      Icon(
+                        SessionRolePalette.iconFor(role),
+                        color: colors.fg,
+                        size: 34,
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              loc.securityRole(role),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w800,
+                                color: colors.fg,
+                                height: 1.15,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                Text(
+                                  loc.settingsLoginCardTitle,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: colors.fg.withValues(alpha: 0.75),
+                                  ),
+                                ),
+                                const SizedBox(width: 2),
+                                Icon(
+                                  Icons.arrow_forward_rounded,
+                                  size: 15,
+                                  color: colors.fg.withValues(alpha: 0.75),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  )
+                : FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.center,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        CircleAvatar(
+                          radius: compact ? 18 : 22,
+                          backgroundColor:
+                              scheme.surface.withValues(alpha: 0.75),
+                          child: Icon(
+                            SessionRolePalette.iconFor(role),
+                            color: colors.fg,
+                            size: compact ? 22 : 26,
+                          ),
+                        ),
+                        SizedBox(height: compact ? 5 : 8),
+                        Text(
+                          loc.securityRole(role),
+                          textAlign: TextAlign.center,
+                          maxLines: compact ? 1 : 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: compact ? 12.5 : 13.5,
+                            fontWeight: FontWeight.w800,
+                            color: colors.fg,
+                            height: 1.1,
+                          ),
+                        ),
+                        SizedBox(height: compact ? 2 : 4),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              loc.settingsLoginCardTitle,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: compact ? 10 : 11,
+                                fontWeight: FontWeight.w600,
+                                color: colors.fg.withValues(alpha: 0.75),
+                              ),
+                            ),
+                            const SizedBox(width: 2),
+                            Icon(
+                              Icons.arrow_forward_rounded,
+                              size: compact ? 12 : 14,
+                              color: colors.fg.withValues(alpha: 0.75),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
           ),
         ),
       ),

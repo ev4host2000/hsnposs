@@ -1,22 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:mizapos_desktop/l10n/app_localizations.dart';
 
-/// بطاقة عرض أسعار MizaPos: POS ($70 دفعة واحدة) + سحابة الموزّعين ($50/سنة).
+/// بطاقة عرض أسعار MizaPos: اشتراك سنوي $70 (حاسوب + أندرويد).
 class SubscriptionPlanCard extends StatelessWidget {
   const SubscriptionPlanCard({
     super.key,
     this.compact = false,
     this.rail = false,
+    this.banner = false,
   });
 
   final bool compact;
 
-  /// لوحة جانبية عمودية داخل حوار التفعيل (حاسوب) — تدرّج داكن وأسعار بارزة.
+  /// لوحة جانبية عمودية داخل حوار التفعيل (حاسوب/أفقي) — تدرّج داكن وأسعار بارزة.
   final bool rail;
+
+  /// شريط أفقي مدمج لشاشات الجوال العمودية.
+  final bool banner;
 
   @override
   Widget build(BuildContext context) {
     if (rail) return _planRailCard(context);
+    if (banner) return _planBannerCard(context);
     final loc = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
@@ -52,17 +57,6 @@ class SubscriptionPlanCard extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             _MainPlanHero(
-              loc: loc,
-              theme: theme,
-              compact: compact,
-              padding: pad,
-            ),
-            Divider(
-              height: 1,
-              thickness: 1,
-              color: scheme.outlineVariant.withValues(alpha: 0.35),
-            ),
-            _CloudAddonSection(
               loc: loc,
               theme: theme,
               compact: compact,
@@ -225,76 +219,6 @@ class SubscriptionPlanCard extends StatelessWidget {
             const SizedBox(height: 10),
             _RailDeviceTiles(loc: loc),
             const SizedBox(height: 20),
-            DecoratedBox(
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.2),
-                ),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF0EA5E9).withValues(alpha: 0.22),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Padding(
-                        padding: EdgeInsets.all(7),
-                        child: Icon(
-                          Icons.cloud_outlined,
-                          color: Color(0xFFBAE6FD),
-                          size: 20,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            loc.subscriptionPlanCloudAddonTitle,
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.9),
-                              fontWeight: FontWeight.w800,
-                              fontSize: 11,
-                              height: 1.25,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            loc.subscriptionPlanCloudAddonPrice,
-                            style: const TextStyle(
-                              color: Color(0xFF7DD3FC),
-                              fontWeight: FontWeight.w900,
-                              fontSize: 20,
-                              height: 1,
-                              letterSpacing: -0.3,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            loc.subscriptionPlanCloudAddonBody,
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.72),
-                              fontWeight: FontWeight.w600,
-                              fontSize: 11,
-                              height: 1.4,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
             Text(
               loc.subscriptionPlanFootnote,
               textAlign: TextAlign.center,
@@ -303,6 +227,113 @@ class SubscriptionPlanCard extends StatelessWidget {
                 fontSize: 10.5,
                 height: 1.4,
                 fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// شريط تسعير أفقي للجوال — الخطة السنوية $70 (حاسوب + أندرويد).
+  Widget _planBannerCard(BuildContext context) {
+    final loc = AppLocalizations.of(context);
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        gradient: const LinearGradient(
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+          colors: [
+            Color(0xFF0F172A),
+            Color(0xFF1E3A5F),
+            Color(0xFF2563EB),
+            Color(0xFF6D28D9),
+          ],
+          stops: [0.0, 0.3, 0.7, 1.0],
+        ),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x402563EB),
+            blurRadius: 16,
+            offset: Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 13, 14, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _PillBadge(
+              icon: Icons.bolt_rounded,
+              label: loc.subscriptionPlanBadgeOneTime,
+              background: Colors.white.withValues(alpha: 0.18),
+              foreground: Colors.white,
+              compact: true,
+            ),
+            const SizedBox(height: 8),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  '\$',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 20,
+                    height: 1,
+                    color: Colors.white.withValues(alpha: 0.82),
+                  ),
+                ),
+                Text(
+                  loc.subscriptionPlanPriceAmount,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 40,
+                    height: 0.92,
+                    letterSpacing: -2,
+                    color: Colors.white,
+                    fontFeatures: [FontFeature.tabularFigures()],
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        loc.subscriptionPlanPriceCurrency,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 11,
+                          height: 1,
+                        ),
+                      ),
+                      Text(
+                        loc.subscriptionPlanPriceSuffix,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.78),
+                          fontWeight: FontWeight.w600,
+                          fontSize: 10,
+                          height: 1,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              loc.subscriptionPlanPriceHeadline,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.88),
+                fontWeight: FontWeight.w600,
+                fontSize: 10.5,
+                height: 1.35,
               ),
             ),
           ],
@@ -531,127 +562,6 @@ class _FeatureTile extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _CloudAddonSection extends StatelessWidget {
-  const _CloudAddonSection({
-    required this.loc,
-    required this.theme,
-    required this.compact,
-    required this.padding,
-  });
-
-  final AppLocalizations loc;
-  final ThemeData theme;
-  final bool compact;
-  final double padding;
-
-  static const _cloudFg = Color(0xFF0369A1);
-  static const _cloudAccent = Color(0xFF0EA5E9);
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = theme.colorScheme;
-
-    return Padding(
-      padding: EdgeInsets.all(padding),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(compact ? 14 : 16),
-          gradient: LinearGradient(
-            begin: AlignmentDirectional.centerStart,
-            end: AlignmentDirectional.centerEnd,
-            colors: [
-              const Color(0xFFE0F2FE).withValues(alpha: 0.85),
-              scheme.surface.withValues(alpha: 0.9),
-            ],
-          ),
-          border: Border.all(
-            color: _cloudAccent.withValues(alpha: 0.35),
-          ),
-        ),
-        child: IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Container(
-                width: 4,
-                decoration: BoxDecoration(
-                  color: _cloudAccent,
-                  borderRadius: const BorderRadiusDirectional.horizontal(
-                    start: Radius.circular(16),
-                  ),
-                ),
-              ),
-              Expanded(
-                child: Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    compact ? 12 : 14,
-                    compact ? 12 : 14,
-                    compact ? 12 : 14,
-                    compact ? 12 : 14,
-                  ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.72),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Icon(
-                          Icons.cloud_outlined,
-                          size: compact ? 20 : 22,
-                          color: _cloudFg,
-                        ),
-                      ),
-                      SizedBox(width: compact ? 10 : 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _PillBadge(
-                              icon: Icons.add_circle_outline_rounded,
-                              label: loc.subscriptionPlanCloudAddonTitle,
-                              background: _cloudFg.withValues(alpha: 0.12),
-                              foreground: _cloudFg,
-                              compact: true,
-                            ),
-                            SizedBox(height: compact ? 8 : 10),
-                            Text(
-                              loc.subscriptionPlanCloudAddonPrice,
-                              style: TextStyle(
-                                fontWeight: FontWeight.w900,
-                                fontSize: compact ? 22 : 26,
-                                height: 1,
-                                letterSpacing: -0.5,
-                                color: _cloudFg,
-                                fontFeatures: const [FontFeature.tabularFigures()],
-                              ),
-                            ),
-                            SizedBox(height: compact ? 6 : 8),
-                            Text(
-                              loc.subscriptionPlanCloudAddonBody,
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: scheme.onSurface.withValues(alpha: 0.72),
-                                height: 1.4,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }
