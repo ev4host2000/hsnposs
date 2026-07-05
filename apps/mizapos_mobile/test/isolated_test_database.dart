@@ -1,0 +1,41 @@
+import 'dart:io';
+
+import 'package:mizapos_mobile/services/database_runtime_profile.dart';
+import 'package:mizapos_mobile/services/database_service.dart';
+import 'package:mizapos_mobile/utils/app_data_paths.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+
+Directory? _isolatedTestDbDir;
+
+/// يوجّه [DatabaseService] إلى SQLite معزول — لا يمس مسار الإنتاج.
+Future<void> setUpIsolatedTestDatabase({
+  DatabaseRuntimeProfile profile = DatabaseRuntimeProfile.unitTest,
+}) async {
+  assert(
+    profile == DatabaseRuntimeProfile.integrationTest ||
+        profile == DatabaseRuntimeProfile.unitTest,
+  );
+  sqfliteFfiInit();
+  databaseFactory = databaseFactoryFfi;
+  await DatabaseService.closeAndResetForTesting();
+  _isolatedTestDbDir ??=
+      await Directory.systemTemp.createTemp('mizapos_test_sqlite_');
+  if (profile == DatabaseRuntimeProfile.integrationTest) {
+    DatabaseService.setIntegrationTestDatabaseDirectory(_isolatedTestDbDir!.path);
+  } else {
+    DatabaseService.setTestDatabaseDirectory(_isolatedTestDbDir!.path);
+  }
+  await initAppDataDirectory();
+}
+
+Future<void> tearDownIsolatedTestDatabase() async {
+  await DatabaseService.closeAndResetForTesting();
+  if (_isolatedTestDbDir != null) {
+    try {
+      await _isolatedTestDbDir!.delete(recursive: true);
+    } on Object {
+      /* ignore */
+    }
+    _isolatedTestDbDir = null;
+  }
+}

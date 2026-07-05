@@ -1,0 +1,105 @@
+{
+  "info": {
+    "name": "Miza Cloud — Authentication",
+    "description": "Auth endpoints per cloud/docs/contracts/01-authentication.md",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://127.0.0.1:8787" },
+    { "key": "companyId", "value": "550e8400-e29b-41d4-a716-446655440000" },
+    { "key": "branchId", "value": "660e8400-e29b-41d4-a716-446655440001" },
+    { "key": "deviceId", "value": "770e8400-e29b-41d4-a716-446655440002" },
+    { "key": "installationId", "value": "a1b2c3d4-e5f6-7890-abcd-ef1234567890" },
+    { "key": "username", "value": "owner@store.com" },
+    { "key": "password", "value": "MizaTest123!" },
+    { "key": "accessToken", "value": "" },
+    { "key": "refreshToken", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "POST /v1/auth/login",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "const json = pm.response.json();",
+              "pm.test('ok true', () => pm.expect(json.ok).to.eql(true));",
+              "if (json.data) {",
+              "  pm.collectionVariables.set('accessToken', json.data.access_token);",
+              "  pm.collectionVariables.set('refreshToken', json.data.refresh_token);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "X-Device-ID", "value": "{{deviceId}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"{{password}}\",\n  \"company_id\": \"{{companyId}}\",\n  \"branch_id\": \"{{branchId}}\",\n  \"device_id\": \"{{deviceId}}\",\n  \"installation_id\": \"{{installationId}}\"\n}"
+        },
+        "url": "{{baseUrl}}/v1/auth/login"
+      }
+    },
+    {
+      "name": "GET /v1/auth/me",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+          { "key": "X-Device-ID", "value": "{{deviceId}}" },
+          { "key": "X-Company-ID", "value": "{{companyId}}" }
+        ],
+        "url": "{{baseUrl}}/v1/auth/me"
+      }
+    },
+    {
+      "name": "POST /v1/auth/token/refresh",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "const json = pm.response.json();",
+              "if (json.data) {",
+              "  pm.collectionVariables.set('accessToken', json.data.access_token);",
+              "  pm.collectionVariables.set('refreshToken', json.data.refresh_token);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"refresh_token\": \"{{refreshToken}}\",\n  \"device_id\": \"{{deviceId}}\",\n  \"installation_id\": \"{{installationId}}\"\n}"
+        },
+        "url": "{{baseUrl}}/v1/auth/token/refresh"
+      }
+    },
+    {
+      "name": "POST /v1/auth/logout",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"refresh_token\": \"{{refreshToken}}\",\n  \"revoke_all_sessions\": false\n}"
+        },
+        "url": "{{baseUrl}}/v1/auth/logout"
+      }
+    }
+  ]
+}

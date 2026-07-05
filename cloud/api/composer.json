@@ -1,0 +1,17 @@
+{
+  "name": "mizapos/cloud-api",
+  "description": "Miza Cloud REST API — modular backend",
+  "type": "project",
+  "license": "proprietary",
+  "require": {
+    "php": ">=8.2"
+  },
+  "autoload": {
+    "psr-4": {
+      "MizaCloud\\": "src/"
+    }
+  },
+  "config": {
+    "sort-packages": true
+  }
+}
