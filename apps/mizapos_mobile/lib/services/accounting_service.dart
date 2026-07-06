@@ -19,6 +19,7 @@ import 'package:mizapos_mobile/services/cloud/sync/product_sync_outbox_writer.da
 import 'package:mizapos_mobile/services/cloud/sync/transaction_invoice_sync_service.dart';
 import 'package:mizapos_mobile/services/cloud/sync/transaction_payment_sync_service.dart';
 import 'package:mizapos_mobile/services/cloud/sync/transaction_inventory_adjustment_sync_service.dart';
+import 'package:mizapos_mobile/services/cloud/sync/transaction_opening_stock_sync_service.dart';
 import 'package:mizapos_mobile/services/cloud/sync/transaction_return_sync_service.dart';
 import 'package:mizapos_mobile/services/database_service.dart';
 import 'package:mizapos_mobile/services/operational_scope_resolver.dart';
@@ -5593,6 +5594,8 @@ class AccountingService {
         product.organizationId,
         product.branchId,
       );
+      final initialStockQty =
+          (!product.isService && product.stockQty > 1e-9) ? 0.0 : product.stockQty;
       await db.transaction((txn) async {
         await _requireCanAddCatalogProductInTxn(
           txn,
@@ -5606,7 +5609,7 @@ class AccountingService {
           'name': product.name,
           'salePrice': product.salePrice,
           'costPrice': product.costPrice,
-          'stockQty': product.stockQty,
+          'stockQty': initialStockQty,
           'barcode': barcode,
           'categoryId': categoryIdOrNull,
           'description':
@@ -5622,6 +5625,12 @@ class AccountingService {
           'createdAt': DateTime.now().toIso8601String(),
         });
       });
+      if (!product.isService && product.stockQty > 1e-9) {
+        await createOpeningStock(
+          productId: product.id,
+          openingQuantity: product.stockQty,
+        );
+      }
     } on ProductCatalogTrialLimitException {
       rethrow;
     } catch (e) {
@@ -5688,7 +5697,7 @@ class AccountingService {
     final db = await _databaseService.database;
     final rows = await db.query(
       'products',
-      columns: const ['isService'],
+      columns: const ['isService', 'stockQty'],
       where: 'id = ? AND organizationId = ? AND branchId = ?',
       whereArgs: [productId, s.organizationId, s.branchId],
       limit: 1,
@@ -5699,14 +5708,21 @@ class AccountingService {
     if ((((rows.first['isService'] as num?) ?? 0).toInt()) == 1) {
       throw Exception('أصناف الخدمة لا تحتفظ بكمية في المستودع.');
     }
-    final n = await db.update(
-      'products',
-      {'stockQty': stockQty},
-      where: 'id = ? AND organizationId = ? AND branchId = ?',
-      whereArgs: [productId, s.organizationId, s.branchId],
-    );
-    if (n == 0) {
-      throw Exception('الصنف غير موجود.');
+    final currentQty = (rows.first['stockQty'] as num?)?.toDouble() ?? 0.0;
+    if ((stockQty - currentQty).abs() < 1e-9) {
+      return;
+    }
+    if (stockQty > currentQty) {
+      await createOpeningStock(
+        productId: productId,
+        openingQuantity: stockQty - currentQty,
+      );
+    } else {
+      await createInventoryAdjustment(
+        productId: productId,
+        quantityDelta: stockQty - currentQty,
+        adjustmentReason: 'correction',
+      );
     }
     await _audit(
       'update',
@@ -5792,6 +5808,59 @@ class AccountingService {
       'Stock adjustment delta $quantityDelta ($reason)',
     );
     return adjustmentId;
+  }
+
+  /// تسجيل رصيد افتتاحي للمخزون عبر مسار المزامنة (كمية موجبة فقط).
+  Future<String> createOpeningStock({
+    required String productId,
+    required double openingQuantity,
+    String notes = '',
+    DateTime? openingDate,
+  }) async {
+    _requireManageProductsBasic();
+    _requireRegisteredOperationalAccess();
+    if (openingQuantity < 1e-9) {
+      throw Exception('كمية الرصيد الافتتاحي يجب أن تكون موجبة.');
+    }
+    final s = _mustSession();
+    final db = await _databaseService.database;
+    final rows = await db.query(
+      'products',
+      columns: const ['isService'],
+      where: 'id = ? AND organizationId = ? AND branchId = ?',
+      whereArgs: [productId, s.organizationId, s.branchId],
+      limit: 1,
+    );
+    if (rows.isEmpty) {
+      throw Exception('الصنف غير موجود.');
+    }
+    if ((((rows.first['isService'] as num?) ?? 0).toInt()) == 1) {
+      throw Exception('أصناف الخدمة لا تحتفظ بكمية في المستودع.');
+    }
+    final openingStockId = _uuid.v4();
+    final when = openingDate ?? DateTime.now();
+    final postResult = await TransactionOpeningStockSyncService(
+      databaseService: _databaseService,
+    ).createOpeningStockDraftAndPost(
+      openingStockId: openingStockId,
+      organizationId: s.organizationId,
+      branchId: s.branchId,
+      userId: s.userId,
+      productId: productId,
+      openingQuantity: openingQuantity,
+      openingDate: when,
+      notes: notes.isEmpty ? null : notes,
+    );
+    if (!postResult.ok) {
+      throw Exception(transactionOpeningStockPostFailureMessage(postResult));
+    }
+    await _audit(
+      'create',
+      'opening_stock',
+      openingStockId,
+      'Opening stock quantity $openingQuantity',
+    );
+    return openingStockId;
   }
 
   Future<void> setProductBarcode({

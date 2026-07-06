@@ -22,6 +22,7 @@ import 'package:mizapos_mobile/services/cloud/sync/customer_payment_sync_registr
 import 'package:mizapos_mobile/services/cloud/sync/sales_return_sync_registry.dart';
 import 'package:mizapos_mobile/services/cloud/sync/supplier_payment_sync_registry.dart';
 import 'package:mizapos_mobile/services/cloud/sync/inventory_adjustment_sync_registry.dart';
+import 'package:mizapos_mobile/services/cloud/sync/opening_stock_sync_registry.dart';
 import 'package:mizapos_mobile/services/cloud/sync/transaction_sync_outbox_writer.dart';
 import 'package:mizapos_mobile/services/cloud/sync/transactions/transaction_registry.dart';
 import 'package:mizapos_mobile/services/cloud/sync/products_pull_worker.dart';
@@ -98,6 +99,7 @@ class BackgroundSyncBootstrap {
     CustomerPaymentSyncRegistry.registerWith(registry: transactionRegistry);
     SupplierPaymentSyncRegistry.registerWith(registry: transactionRegistry);
     InventoryAdjustmentSyncRegistry.registerWith(registry: transactionRegistry);
+    OpeningStockSyncRegistry.registerWith(registry: transactionRegistry);
 
     final syncRepository = ProductsSyncRepository(
       productsSyncApi: ProductsSyncApi(apiClient: apiClient, config: cloudConfig),
