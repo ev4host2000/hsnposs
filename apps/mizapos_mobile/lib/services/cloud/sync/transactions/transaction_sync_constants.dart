@@ -19,6 +19,7 @@ class TransactionSyncConstants {
     'purchase_return',
     'customer_payment',
     'supplier_payment',
+    'inventory_adjustment',
   ];
 
   static const List<String> transactionPullScopes = [
@@ -28,6 +29,7 @@ class TransactionSyncConstants {
     'purchase_returns',
     'customer_payments',
     'supplier_payments',
+    'inventory_adjustments',
   ];
 
   static const List<String> supportedOperations = [

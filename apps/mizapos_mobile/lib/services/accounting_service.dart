@@ -18,6 +18,7 @@ import 'package:mizapos_mobile/services/cloud/sync/partners_sync_constants.dart'
 import 'package:mizapos_mobile/services/cloud/sync/product_sync_outbox_writer.dart';
 import 'package:mizapos_mobile/services/cloud/sync/transaction_invoice_sync_service.dart';
 import 'package:mizapos_mobile/services/cloud/sync/transaction_payment_sync_service.dart';
+import 'package:mizapos_mobile/services/cloud/sync/transaction_inventory_adjustment_sync_service.dart';
 import 'package:mizapos_mobile/services/cloud/sync/transaction_return_sync_service.dart';
 import 'package:mizapos_mobile/services/database_service.dart';
 import 'package:mizapos_mobile/services/operational_scope_resolver.dart';
@@ -5716,18 +5717,35 @@ class AccountingService {
   }
 
   /// تعديل كمية المخزون بزيادة أو نقصان (قيمة موجبة أو سالبة).
-  Future<void> adjustProductStockDelta({
+  Future<String> adjustProductStockDelta({
     required String productId,
     required double delta,
   }) async {
+    return createInventoryAdjustment(
+      productId: productId,
+      quantityDelta: delta,
+      adjustmentReason: 'correction',
+    );
+  }
+
+  /// تسجيل تعديل مخزون عبر مسار المزامنة (زيادة/نقصان موقّع).
+  Future<String> createInventoryAdjustment({
+    required String productId,
+    required double quantityDelta,
+    required String adjustmentReason,
+    String notes = '',
+    DateTime? adjustmentDate,
+  }) async {
     _requireManageProductsBasic();
     _requireRegisteredOperationalAccess();
-    if (delta == 0) return;
+    if (quantityDelta.abs() < 1e-9) {
+      throw Exception('كمية التعديل يجب أن تكون غير صفرية.');
+    }
     final s = _mustSession();
     final db = await _databaseService.database;
     final rows = await db.query(
       'products',
-      columns: const ['isService', 'stockQty'],
+      columns: const ['isService'],
       where: 'id = ? AND organizationId = ? AND branchId = ?',
       whereArgs: [productId, s.organizationId, s.branchId],
       limit: 1,
@@ -5738,28 +5756,42 @@ class AccountingService {
     if ((((rows.first['isService'] as num?) ?? 0).toInt()) == 1) {
       throw Exception('أصناف الخدمة لا تحتفظ بكمية في المستودع.');
     }
-    final current = ((rows.first['stockQty'] as num?) ?? 0).toDouble();
-    final next = current + delta;
-    if (next < -1e-9) {
-      throw Exception(
-        'لا يمكن خصم أكثر من الكمية الحالية (${current.toString()}).',
-      );
+    final reason = adjustmentReason.trim().toLowerCase();
+    const allowed = {
+      'count',
+      'damage',
+      'loss',
+      'gain',
+      'correction',
+    };
+    if (!allowed.contains(reason)) {
+      throw Exception('سبب التعديل غير صالح.');
     }
-    final n = await db.update(
-      'products',
-      {'stockQty': next},
-      where: 'id = ? AND organizationId = ? AND branchId = ?',
-      whereArgs: [productId, s.organizationId, s.branchId],
+    final adjustmentId = _uuid.v4();
+    final when = adjustmentDate ?? DateTime.now();
+    final postResult = await TransactionInventoryAdjustmentSyncService(
+      databaseService: _databaseService,
+    ).createInventoryAdjustmentDraftAndPost(
+      adjustmentId: adjustmentId,
+      organizationId: s.organizationId,
+      branchId: s.branchId,
+      userId: s.userId,
+      productId: productId,
+      quantityDelta: quantityDelta,
+      adjustmentReason: reason,
+      adjustmentDate: when,
+      notes: notes.isEmpty ? null : notes,
     );
-    if (n == 0) {
-      throw Exception('الصنف غير موجود.');
+    if (!postResult.ok) {
+      throw Exception(transactionInventoryAdjustmentPostFailureMessage(postResult));
     }
     await _audit(
-      'update',
-      'product',
-      productId,
-      'Adjusted stock by $delta (was $current, now $next)',
+      'create',
+      'inventory_adjustment',
+      adjustmentId,
+      'Stock adjustment delta $quantityDelta ($reason)',
     );
+    return adjustmentId;
   }
 
   Future<void> setProductBarcode({
@@ -8538,7 +8570,7 @@ class AccountingService {
   }
 
   /// خصم كمية تالفة من المخزون (لا يمر عبر فاتورة).
-  Future<void> recordDamagedStock({
+  Future<String> recordDamagedStock({
     required String productId,
     required double quantity,
     String notes = '',
@@ -8548,38 +8580,11 @@ class AccountingService {
     if (quantity <= 0) {
       throw Exception('كمية التالف يجب أن تكون أكبر من صفر.');
     }
-    final s = _mustSession();
-    final db = await _databaseService.database;
-    final refId = _uuid.v4();
-    final nowIso = DateTime.now().toIso8601String();
-    await db.transaction((txn) async {
-      final n = await txn.rawUpdate(
-        'UPDATE products SET stockQty = stockQty - ? '
-        'WHERE id = ? AND organizationId = ? AND branchId = ? '
-        'AND stockQty + 1e-9 >= ?',
-        [quantity, productId, s.organizationId, s.branchId, quantity],
-      );
-      if (n == 0) {
-        throw Exception('الكمية غير متوفرة في المخزون أو الصنف غير موجود.');
-      }
-      await txn.insert('stockMovements', {
-        'id': _uuid.v4(),
-        'organizationId': s.organizationId,
-        'branchId': s.branchId,
-        'productId': productId,
-        'movementType': 'out',
-        'quantity': quantity,
-        'referenceType': 'damage',
-        'referenceId': refId,
-        'movementDate': nowIso,
-        'createdBy': s.userId,
-      });
-    });
-    await _audit(
-      'damage',
-      'stock',
-      refId,
-      notes.isEmpty ? 'Damaged stock qty $quantity' : notes,
+    return createInventoryAdjustment(
+      productId: productId,
+      quantityDelta: -quantity,
+      adjustmentReason: 'damage',
+      notes: notes,
     );
   }
 

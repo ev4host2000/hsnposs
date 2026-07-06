@@ -23,6 +23,7 @@ use MizaCloud\Modules\Sync\Controllers\SalesInvoicesSyncController;
 use MizaCloud\Modules\Sync\Controllers\SalesReturnsSyncController;
 use MizaCloud\Modules\Sync\Controllers\CustomerPaymentsSyncController;
 use MizaCloud\Modules\Sync\Controllers\SupplierPaymentsSyncController;
+use MizaCloud\Modules\Sync\Controllers\InventoryAdjustmentsSyncController;
 use MizaCloud\Modules\Sync\Controllers\SyncController;
 use MizaCloud\Modules\Sync\Controllers\TaxesSyncController;
 use MizaCloud\Modules\Sync\Repositories\CustomersSyncRepository;
@@ -37,6 +38,7 @@ use MizaCloud\Modules\Sync\Repositories\SalesInvoicesSyncRepository;
 use MizaCloud\Modules\Sync\Repositories\SalesReturnsSyncRepository;
 use MizaCloud\Modules\Sync\Repositories\CustomerPaymentsSyncRepository;
 use MizaCloud\Modules\Sync\Repositories\SupplierPaymentsSyncRepository;
+use MizaCloud\Modules\Sync\Repositories\InventoryAdjustmentsSyncRepository;
 use MizaCloud\Modules\Sync\Repositories\SyncRepository;
 use MizaCloud\Modules\Sync\Repositories\TaxesSyncRepository;
 use MizaCloud\Modules\Sync\Services\CustomersSyncService;
@@ -51,6 +53,7 @@ use MizaCloud\Modules\Sync\Services\SalesInvoicesSyncService;
 use MizaCloud\Modules\Sync\Services\SalesReturnsSyncService;
 use MizaCloud\Modules\Sync\Services\CustomerPaymentsSyncService;
 use MizaCloud\Modules\Sync\Services\SupplierPaymentsSyncService;
+use MizaCloud\Modules\Sync\Services\InventoryAdjustmentsSyncService;
 use MizaCloud\Modules\Sync\Services\SyncService;
 use MizaCloud\Modules\Sync\Services\TaxesSyncService;
 
@@ -114,6 +117,10 @@ final class SyncModule implements ModuleInterface
         ));
 
         $container->singleton(SupplierPaymentsSyncRepository::class, static fn ($c) => new SupplierPaymentsSyncRepository(
+            $c->get(Connection::class),
+        ));
+
+        $container->singleton(InventoryAdjustmentsSyncRepository::class, static fn ($c) => new InventoryAdjustmentsSyncRepository(
             $c->get(Connection::class),
         ));
 
@@ -198,6 +205,12 @@ final class SyncModule implements ModuleInterface
             logger: $c->get(Logger::class),
         ));
 
+        $container->singleton(InventoryAdjustmentsSyncService::class, static fn ($c) => new InventoryAdjustmentsSyncService(
+            repository: $c->get(InventoryAdjustmentsSyncRepository::class),
+            bearer: $c->get(BearerToken::class),
+            logger: $c->get(Logger::class),
+        ));
+
         $container->singleton(SyncService::class, static fn ($c) => new SyncService($c->get(SyncRepository::class)));
 
         $container->singleton(ProductsSyncController::class, static fn ($c) => new ProductsSyncController(
@@ -265,6 +278,11 @@ final class SyncModule implements ModuleInterface
             $c->get(SupplierPaymentsSyncService::class),
         ));
 
+        $container->singleton(InventoryAdjustmentsSyncController::class, static fn ($c) => new InventoryAdjustmentsSyncController(
+            $c->get(ResponseBuilder::class),
+            $c->get(InventoryAdjustmentsSyncService::class),
+        ));
+
         $container->singleton(SyncController::class, static fn ($c) => new SyncController(
             $c->get(ResponseBuilder::class),
             $c->get(SyncService::class),
@@ -287,6 +305,7 @@ final class SyncModule implements ModuleInterface
             ['purchase-returns', PurchaseReturnsSyncController::class, 'push', 'pull'],
             ['customer-payments', CustomerPaymentsSyncController::class, 'push', 'pull'],
             ['supplier-payments', SupplierPaymentsSyncController::class, 'push', 'pull'],
+            ['inventory-adjustments', InventoryAdjustmentsSyncController::class, 'push', 'pull'],
         ];
 
         foreach ($this->prefixes() as $prefix) {

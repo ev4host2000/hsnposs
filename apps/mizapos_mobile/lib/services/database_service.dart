@@ -127,7 +127,7 @@ class DatabaseService {
     final path = await _resolveDatabasePath();
     return await openDatabase(
       path,
-      version: 53,
+      version: 54,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -394,6 +394,33 @@ class DatabaseService {
     if (oldVersion < 53) {
       await _migrateToV53(db);
     }
+    if (oldVersion < 54) {
+      await _migrateToV54(db);
+    }
+  }
+
+  Future<void> _migrateToV54(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS inventoryAdjustments (
+        id TEXT PRIMARY KEY,
+        organizationId TEXT NOT NULL,
+        branchId TEXT NOT NULL,
+        productId TEXT NOT NULL,
+        quantityDelta REAL NOT NULL,
+        adjustmentReason TEXT NOT NULL,
+        adjustmentDate TEXT NOT NULL,
+        notes TEXT,
+        createdBy TEXT NOT NULL,
+        adjustmentStatus TEXT NOT NULL DEFAULT 'draft',
+        transactionVersion INTEGER NOT NULL DEFAULT 0,
+        rowVersion INTEGER NOT NULL DEFAULT 1,
+        postedAt TEXT
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_inventory_adjustments_scope '
+      'ON inventoryAdjustments(organizationId, branchId, adjustmentDate)',
+    );
   }
 
   Future<void> _migrateToV53(Database db) async {
