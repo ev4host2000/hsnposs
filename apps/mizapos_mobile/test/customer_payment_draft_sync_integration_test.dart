@@ -19,6 +19,7 @@ import 'package:mizapos_mobile/services/cloud/sync/customer_payment_draft_payloa
 import 'package:mizapos_mobile/services/cloud/sync/customer_payment_sync_constants.dart';
 import 'package:mizapos_mobile/services/cloud/sync/customer_payment_sync_registry.dart';
 import 'package:mizapos_mobile/services/cloud/sync/partners_sync_constants.dart';
+import 'package:mizapos_mobile/services/cloud/sync/partners_sync_registry.dart';
 import 'package:mizapos_mobile/services/cloud/sync/products_push_worker.dart';
 import 'package:mizapos_mobile/services/cloud/sync/products_sync_api.dart';
 import 'package:mizapos_mobile/services/cloud/sync/products_sync_repository.dart';
@@ -32,6 +33,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 
 import 'isolated_test_database.dart';
+import 'sync_integration_test_helpers.dart';
 
 /// Customer payment draft sync — requires backend on 127.0.0.1:8787.
 void main() {
@@ -64,6 +66,7 @@ void main() {
   setUp(() async {
     paymentId = const Uuid().v4();
     databaseService = DatabaseService();
+    await prepareSyncIntegrationTest(databaseService: databaseService);
     final db = await databaseService.database;
     for (final table in [
       'customerPayments',
@@ -124,6 +127,11 @@ void main() {
     );
     await deviceManager.register(companyId: companyId, branchId: branchId);
 
+    final partnersRegistry = PartnersSyncRegistry.create(
+      apiClient: apiClient,
+      config: config,
+      databaseService: databaseService,
+    );
     transactionRegistry = TransactionRegistry.create(
       apiClient: apiClient,
       config: config,
@@ -136,6 +144,7 @@ void main() {
     );
     pushWorker = ProductsPushWorker(
       repository: productsRepository,
+      partnersRegistry: partnersRegistry,
       transactionRegistry: transactionRegistry,
     );
   });
@@ -161,25 +170,15 @@ void main() {
   }
 
   Future<void> pushCustomer() async {
-    await CatalogSyncOutboxWriter.record(
-      entityType: PartnersSyncConstants.entityTypeCustomer,
-      operation: 'create',
-      entityId: customerId,
-      organizationId: companyId,
-      branchId: branchId,
-      payload: partnerEntityCloudPayload(
-        id: customerId,
-        organizationId: companyId,
-        branchId: branchId,
-        name: 'Draft Sync Customer',
-      ),
+    await ensureTestCustomerOnCloud(
       databaseService: databaseService,
       storage: storage,
-    );
-    await pushWorker.run(
+      pushWorker: pushWorker,
       companyId: companyId,
       branchId: branchId,
       deviceId: seedDeviceId,
+      customerId: customerId,
+      name: 'Draft Sync Customer',
     );
   }
 

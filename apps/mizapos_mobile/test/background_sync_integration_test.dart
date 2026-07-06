@@ -38,6 +38,7 @@ import 'package:mizapos_mobile/utils/app_data_paths.dart';
 import 'package:mizapos_mobile/services/database_runtime_profile.dart';
 
 import 'isolated_test_database.dart';
+import 'sync_integration_test_helpers.dart';
 import 'package:uuid/uuid.dart';
 
 /// Background Sync scenarios A/B/C — requires backend on 127.0.0.1:8787.
@@ -66,6 +67,7 @@ void main() {
 
   setUp(() async {
     databaseService = DatabaseService();
+    await prepareSyncIntegrationTest(databaseService: databaseService);
     accountingService = AccountingService(databaseService);
     storage = CloudSecureStoragePlaceholder();
     ProductSyncOutboxWriter.bindStorage(storage);
@@ -135,23 +137,19 @@ void main() {
       onlineOverride: () async => true,
     );
 
-    await accountingService.addProduct(
-      ProductEntity(
-        id: const Uuid().v4(),
-        organizationId: companyId,
-        branchId: branchId,
-        name: 'Retry product',
-        salePrice: 20,
-        costPrice: 8,
-        stockQty: 3,
-      ),
+    await _seedPendingOutboxRows(
+      databaseService: databaseService,
+      companyId: companyId,
+      branchId: branchId,
+      count: 1,
+      installationId: installationId,
     );
 
     final result = await stack.engine.run(trigger: SyncTrigger.manual);
     expect(result.status, SyncRunStatus.success);
     expect(recorder.pushAttempts, greaterThan(1));
     expect(await stack.status.countPending(), 0);
-  });
+  }, timeout: const Timeout(Duration(minutes: 2)));
 
   test('C) 120 pending outbox rows push in 3 batches', () async {
     final recorder = _RecordingPushHttpClient(inner: const CloudHttpClientIo());

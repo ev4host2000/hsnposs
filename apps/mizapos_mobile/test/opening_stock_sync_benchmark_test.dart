@@ -33,6 +33,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 
 import 'isolated_test_database.dart';
+import 'sync_integration_test_helpers.dart';
 import 'opening_stock_test_seed.dart';
 
 /// Opening stock sync performance — requires backend on 127.0.0.1:8787.
@@ -78,6 +79,7 @@ void main() {
     if (!backendAvailable) return;
 
     databaseService = DatabaseService();
+    await prepareSyncIntegrationTest(databaseService: databaseService);
     storage = CloudSecureStoragePlaceholder();
     TransactionSyncOutboxWriter.bindStorage(storage);
     ProductSyncOutboxWriter.bindStorage(storage);

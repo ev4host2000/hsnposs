@@ -20,8 +20,10 @@ import 'package:mizapos_mobile/services/cloud/sync/partners_sync_registry.dart';
 import 'package:mizapos_mobile/services/cloud/sync/products_push_worker.dart';
 import 'package:mizapos_mobile/services/cloud/sync/products_sync_api.dart';
 import 'package:mizapos_mobile/services/cloud/sync/products_sync_repository.dart';
+import 'package:mizapos_mobile/services/cloud/sync/purchase_invoice_sync_constants.dart';
 import 'package:mizapos_mobile/services/cloud/sync/purchase_return_draft_payload.dart';
 import 'package:mizapos_mobile/services/cloud/sync/purchase_return_post_local_service.dart';
+import 'package:mizapos_mobile/services/cloud/sync/purchase_invoice_sync_registry.dart';
 import 'package:mizapos_mobile/services/cloud/sync/purchase_return_sync_constants.dart';
 import 'package:mizapos_mobile/services/cloud/sync/purchase_return_sync_registry.dart';
 import 'package:mizapos_mobile/services/cloud/sync/transaction_sync_outbox_writer.dart';
@@ -34,7 +36,9 @@ import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 
 import 'isolated_test_database.dart';
+import 'sync_integration_test_helpers.dart';
 import 'return_test_seed.dart';
+import 'return_sync_test_helpers.dart';
 
 /// Purchase return sync performance — requires backend on 127.0.0.1:8787.
 void main() {
@@ -48,6 +52,7 @@ void main() {
 
   late DatabaseService databaseService;
   late CloudSecureStoragePlaceholder storage;
+  late CloudApiClient apiClient;
   late ProductsPushWorker pushWorker;
   late TransactionRegistry transactionRegistry;
 
@@ -65,13 +70,14 @@ void main() {
 
   setUp(() async {
     databaseService = DatabaseService();
+    await prepareSyncIntegrationTest(databaseService: databaseService);
     storage = CloudSecureStoragePlaceholder();
     TransactionSyncOutboxWriter.bindStorage(storage);
     CatalogSyncOutboxWriter.bindStorage(storage);
 
     final config = CloudConfig.development();
     const httpClient = CloudHttpClientIo();
-    final apiClient = CloudApiClient(
+    apiClient = CloudApiClient(
       httpClient: httpClient,
       config: config,
       storage: storage,
@@ -113,11 +119,13 @@ void main() {
       config: config,
       databaseService: databaseService,
     );
-    transactionRegistry = PurchaseReturnSyncRegistry.createRegistered(
+    transactionRegistry = TransactionRegistry.create(
       apiClient: apiClient,
       config: config,
       databaseService: databaseService,
     );
+    PurchaseInvoiceSyncRegistry.registerWith(registry: transactionRegistry);
+    PurchaseReturnSyncRegistry.registerWith(registry: transactionRegistry);
     final productsRepository = ProductsSyncRepository(
       productsSyncApi: ProductsSyncApi(apiClient: apiClient, config: config),
       databaseService: databaseService,
@@ -151,32 +159,36 @@ void main() {
   });
 
   Future<void> seedProductOnce() async {
-    final db = await databaseService.database;
-    final existing = await db.query(
-      'products',
-      where: 'id = ?',
-      whereArgs: [seedProductId],
-      limit: 1,
+    await ensureTestProductOnCloud(
+      databaseService: databaseService,
+      storage: storage,
+      pushWorker: pushWorker,
+      companyId: companyId,
+      branchId: branchId,
+      deviceId: seedDeviceId,
+      productId: seedProductId,
     );
-    if (existing.isNotEmpty) return;
-    await db.insert('products', {
-      'id': seedProductId,
-      'organizationId': companyId,
-      'branchId': branchId,
-      'name': 'Sync Bench Product',
-      'salePrice': 10.0,
-      'costPrice': 5.0,
-      'stockQty': 1000000.0,
-      'isHidden': 0,
-      'isFrozen': 0,
-      'isService': 0,
-      'createdAt': DateTime.now().toIso8601String(),
-    });
   }
 
   Future<Map<String, double>> benchmarkFullCycle(int count) async {
     await seedProductOnce();
     final db = await databaseService.database;
+    await advanceSyncMetaToCloudTail(
+      apiClient: apiClient,
+      db: db,
+      organizationId: companyId,
+      branchId: branchId,
+      scopeKey: PurchaseInvoiceSyncConstants.scopeKey,
+      pullPath: PurchaseInvoiceSyncConstants.pullPath,
+    );
+    await advanceSyncMetaToCloudTail(
+      apiClient: apiClient,
+      db: db,
+      organizationId: companyId,
+      branchId: branchId,
+      scopeKey: PurchaseReturnSyncConstants.scopeKey,
+      pullPath: PurchaseReturnSyncConstants.pullPath,
+    );
     await db.delete('purchaseReturns');
     await db.delete('purchaseReturnItems');
     await db.delete('purchaseInvoices');
@@ -206,8 +218,9 @@ void main() {
       final returnLineId = const Uuid().v4();
       returnIds.add(returnId);
 
-      await ReturnTestSeed.seedPostedParentPurchaseInvoice(
-        db,
+      await stagePostedPurchaseInvoiceForSync(
+        databaseService: databaseService,
+        storage: storage,
         originalInvoiceId: originalInvoiceId,
         parentLineId: parentLineId,
         companyId: companyId,
@@ -215,6 +228,7 @@ void main() {
         supplierId: supplierId,
         productId: seedProductId,
         userId: userId,
+        deviceId: seedDeviceId,
         total: 20,
       );
       await ReturnTestSeed.seedPurchaseReturnDraft(

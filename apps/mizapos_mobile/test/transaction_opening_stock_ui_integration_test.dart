@@ -8,6 +8,7 @@ import 'package:mizapos_mobile/services/database_service.dart';
 import 'package:sqflite/sqflite.dart';
 
 import 'isolated_test_database.dart';
+import 'sync_integration_test_helpers.dart';
 
 /// Verifies UI save path: draft insert → outbox create → post pipeline for opening stock.
 void main() {
@@ -31,6 +32,7 @@ void main() {
 
   setUp(() async {
     databaseService = DatabaseService();
+    await prepareSyncIntegrationTest(databaseService: databaseService);
     syncService =
         TransactionOpeningStockSyncService(databaseService: databaseService);
     final storage = CloudSecureStoragePlaceholder();

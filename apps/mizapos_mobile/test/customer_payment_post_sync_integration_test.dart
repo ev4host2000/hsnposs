@@ -35,6 +35,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 
 import 'isolated_test_database.dart';
+import 'sync_integration_test_helpers.dart';
 
 /// Customer payment post sync — requires backend on 127.0.0.1:8787.
 void main() {
@@ -68,6 +69,7 @@ void main() {
   setUp(() async {
     paymentId = const Uuid().v4();
     databaseService = DatabaseService();
+    await prepareSyncIntegrationTest(databaseService: databaseService);
     final db = await databaseService.database;
     for (final table in [
       'customerPayments',

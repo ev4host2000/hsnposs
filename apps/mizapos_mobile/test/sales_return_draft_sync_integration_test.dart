@@ -14,6 +14,7 @@ import 'package:mizapos_mobile/services/cloud/devices/device_manager.dart';
 import 'package:mizapos_mobile/services/cloud/devices/device_repository.dart';
 import 'package:mizapos_mobile/services/cloud/devices/device_service.dart';
 import 'package:mizapos_mobile/services/cloud/storage/cloud_secure_storage_placeholder.dart';
+import 'package:mizapos_mobile/services/cloud/sync/partners_sync_registry.dart';
 import 'package:mizapos_mobile/services/cloud/sync/products_push_worker.dart';
 import 'package:mizapos_mobile/services/cloud/sync/products_sync_api.dart';
 import 'package:mizapos_mobile/services/cloud/sync/products_sync_repository.dart';
@@ -34,6 +35,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 
 import 'isolated_test_database.dart';
+import 'sync_integration_test_helpers.dart';
 import 'return_test_seed.dart';
 
 /// Sales return draft sync — requires backend on 127.0.0.1:8787.
@@ -75,6 +77,7 @@ void main() {
     returnId = const Uuid().v4();
     returnLineId = const Uuid().v4();
     databaseService = DatabaseService();
+    await prepareSyncIntegrationTest(databaseService: databaseService);
     final db = await databaseService.database;
     for (final table in [
       'salesReturns',
@@ -167,6 +170,11 @@ void main() {
     );
     await deviceManager.register(companyId: companyId, branchId: branchId);
 
+    final partnersRegistry = PartnersSyncRegistry.create(
+      apiClient: apiClient,
+      config: config,
+      databaseService: databaseService,
+    );
     transactionRegistry = TransactionRegistry.create(
       apiClient: apiClient,
       config: config,
@@ -180,6 +188,7 @@ void main() {
     );
     pushWorker = ProductsPushWorker(
       repository: productsRepository,
+      partnersRegistry: partnersRegistry,
       transactionRegistry: transactionRegistry,
     );
   });
@@ -278,6 +287,26 @@ void main() {
   }
 
   Future<void> pushOriginalInvoiceToCloud() async {
+    await ensureTestCustomerOnCloud(
+      databaseService: databaseService,
+      storage: storage,
+      pushWorker: pushWorker,
+      companyId: companyId,
+      branchId: branchId,
+      deviceId: seedDeviceId,
+      customerId: customerId,
+      name: 'Draft Sync Customer',
+    );
+    await ensureTestProductOnCloud(
+      databaseService: databaseService,
+      storage: storage,
+      pushWorker: pushWorker,
+      companyId: companyId,
+      branchId: branchId,
+      deviceId: seedDeviceId,
+      productId: productId,
+      name: 'Draft Sync Product $returnId',
+    );
     await TransactionSyncOutboxWriter.record(
       entityType: SalesInvoiceSyncConstants.entityType,
       operation: 'create',
