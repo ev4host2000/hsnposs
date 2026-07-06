@@ -1,5 +1,5 @@
 -- =============================================================================
--- Miza Cloud — 013_return_transaction_version.sql
+-- Miza Cloud — 014_return_transaction_version.sql
 -- Adds transaction_version + posted_at for ADR-TX draft lifecycle on returns
 -- =============================================================================
 
@@ -25,9 +25,9 @@ COMMENT ON COLUMN purchase_returns.transaction_version IS
 
 INSERT INTO schema_migrations (version, description, checksum)
 VALUES (
-    '013',
+    '014',
     'sales_return and purchase_return transaction_version columns',
-    '013_return_transaction_version.sql'
+    '014_return_transaction_version.sql'
 )
 ON CONFLICT (version) DO NOTHING;
 

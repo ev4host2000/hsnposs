@@ -1,5 +1,5 @@
 -- =============================================================================
--- Miza Cloud — 014_payment_transaction_version.sql
+-- Miza Cloud — 015_payment_transaction_version.sql
 -- Customer/supplier payment tables for ADR-TX draft lifecycle (Feature Pack 2)
 -- =============================================================================
 
@@ -139,9 +139,9 @@ CREATE TRIGGER trg_supplier_payments_bump_row_version
 
 INSERT INTO schema_migrations (version, description, checksum)
 VALUES (
-    '014',
+    '015',
     'customer_payments and supplier_payments tables',
-    '014_payment_transaction_version.sql'
+    '015_payment_transaction_version.sql'
 )
 ON CONFLICT (version) DO NOTHING;
 

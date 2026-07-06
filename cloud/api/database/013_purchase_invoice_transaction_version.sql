@@ -1,5 +1,5 @@
 -- =============================================================================
--- Miza Cloud — 012_purchase_invoice_transaction_version.sql
+-- Miza Cloud — 013_purchase_invoice_transaction_version.sql
 -- Adds transaction_version + posted_at for ADR-TX draft lifecycle on purchase_invoices
 -- =============================================================================
 
@@ -16,9 +16,9 @@ COMMENT ON COLUMN purchase_invoices.transaction_version IS
 
 INSERT INTO schema_migrations (version, description, checksum)
 VALUES (
-    '012',
+    '013',
     'purchase_invoice transaction_version column',
-    '012_purchase_invoice_transaction_version.sql'
+    '013_purchase_invoice_transaction_version.sql'
 )
 ON CONFLICT (version) DO NOTHING;
 
