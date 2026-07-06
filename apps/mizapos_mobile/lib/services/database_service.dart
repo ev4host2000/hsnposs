@@ -127,7 +127,7 @@ class DatabaseService {
     final path = await _resolveDatabasePath();
     return await openDatabase(
       path,
-      version: 52,
+      version: 53,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -391,6 +391,56 @@ class DatabaseService {
     if (oldVersion < 52) {
       await _migrateToV52(db);
     }
+    if (oldVersion < 53) {
+      await _migrateToV53(db);
+    }
+  }
+
+  Future<void> _migrateToV53(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS customerPayments (
+        id TEXT PRIMARY KEY,
+        organizationId TEXT NOT NULL,
+        branchId TEXT NOT NULL,
+        customerId TEXT NOT NULL,
+        amount REAL NOT NULL,
+        paymentDate TEXT NOT NULL,
+        paymentMethod TEXT NOT NULL DEFAULT 'cash',
+        voucherNumber TEXT,
+        notes TEXT,
+        createdBy TEXT NOT NULL,
+        paymentStatus TEXT NOT NULL DEFAULT 'draft',
+        transactionVersion INTEGER NOT NULL DEFAULT 0,
+        rowVersion INTEGER NOT NULL DEFAULT 1,
+        postedAt TEXT
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS supplierPayments (
+        id TEXT PRIMARY KEY,
+        organizationId TEXT NOT NULL,
+        branchId TEXT NOT NULL,
+        supplierId TEXT NOT NULL,
+        amount REAL NOT NULL,
+        paymentDate TEXT NOT NULL,
+        paymentMethod TEXT NOT NULL DEFAULT 'cash',
+        voucherNumber TEXT,
+        notes TEXT,
+        createdBy TEXT NOT NULL,
+        paymentStatus TEXT NOT NULL DEFAULT 'draft',
+        transactionVersion INTEGER NOT NULL DEFAULT 0,
+        rowVersion INTEGER NOT NULL DEFAULT 1,
+        postedAt TEXT
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_customer_payments_scope '
+      'ON customerPayments(organizationId, branchId, paymentDate)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_supplier_payments_scope '
+      'ON supplierPayments(organizationId, branchId, paymentDate)',
+    );
   }
 
   Future<void> _migrateToV52(Database db) async {
@@ -1957,6 +2007,50 @@ class DatabaseService {
     await db.execute(
       'CREATE INDEX IF NOT EXISTS idx_invoice_payment_splits_invoice '
       'ON invoice_payment_splits(invoiceKind, invoiceId)',
+    );
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS customerPayments (
+        id TEXT PRIMARY KEY,
+        organizationId TEXT NOT NULL,
+        branchId TEXT NOT NULL,
+        customerId TEXT NOT NULL,
+        amount REAL NOT NULL,
+        paymentDate TEXT NOT NULL,
+        paymentMethod TEXT NOT NULL DEFAULT 'cash',
+        voucherNumber TEXT,
+        notes TEXT,
+        createdBy TEXT NOT NULL,
+        paymentStatus TEXT NOT NULL DEFAULT 'draft',
+        transactionVersion INTEGER NOT NULL DEFAULT 0,
+        rowVersion INTEGER NOT NULL DEFAULT 1,
+        postedAt TEXT
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS supplierPayments (
+        id TEXT PRIMARY KEY,
+        organizationId TEXT NOT NULL,
+        branchId TEXT NOT NULL,
+        supplierId TEXT NOT NULL,
+        amount REAL NOT NULL,
+        paymentDate TEXT NOT NULL,
+        paymentMethod TEXT NOT NULL DEFAULT 'cash',
+        voucherNumber TEXT,
+        notes TEXT,
+        createdBy TEXT NOT NULL,
+        paymentStatus TEXT NOT NULL DEFAULT 'draft',
+        transactionVersion INTEGER NOT NULL DEFAULT 0,
+        rowVersion INTEGER NOT NULL DEFAULT 1,
+        postedAt TEXT
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_customer_payments_scope '
+      'ON customerPayments(organizationId, branchId, paymentDate)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_supplier_payments_scope '
+      'ON supplierPayments(organizationId, branchId, paymentDate)',
     );
   }
 

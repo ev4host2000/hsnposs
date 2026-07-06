@@ -17,6 +17,7 @@ import 'package:mizapos_mobile/services/cloud/sync/catalog_sync_outbox_writer.da
 import 'package:mizapos_mobile/services/cloud/sync/partners_sync_constants.dart';
 import 'package:mizapos_mobile/services/cloud/sync/product_sync_outbox_writer.dart';
 import 'package:mizapos_mobile/services/cloud/sync/transaction_invoice_sync_service.dart';
+import 'package:mizapos_mobile/services/cloud/sync/transaction_payment_sync_service.dart';
 import 'package:mizapos_mobile/services/cloud/sync/transaction_return_sync_service.dart';
 import 'package:mizapos_mobile/services/database_service.dart';
 import 'package:mizapos_mobile/services/operational_scope_resolver.dart';
@@ -8938,15 +8939,16 @@ class AccountingService {
   }
 
   /// قبض من عميل مع خصم الذمة في دفتر الشركاء (يُستخدم للتسديد الحقيقي للآجل).
-  Future<void> recordCustomerPayment({
+  Future<String> recordCustomerPayment({
     required String customerId,
     required double amount,
     String notes = '',
     DateTime? paymentDate,
     String? voucherNumber,
+    String paymentMethod = 'cash',
   }) async {
-    _mustSession();
     _requirePaidSubscription();
+    final s = _mustSession();
     final cid = customerId.trim();
     if (cid.isEmpty) {
       throw Exception('معرف العميل غير صالح.');
@@ -8955,45 +8957,39 @@ class AccountingService {
       throw Exception('المبلغ يجب أن يكون أكبر من صفر.');
     }
     final paymentId = _uuid.v4();
-    final db = await _databaseService.database;
     final when = paymentDate ?? DateTime.now();
-    await db.transaction((txn) async {
-      await _insertCash(
-        txn,
-        CashTransactionInput(
-          type: 'in',
-          amount: amount,
-          description: notes.isEmpty ? 'تسديد دين عميل' : notes,
-          referenceType: 'customer_payment',
-          referenceId: paymentId,
-        ),
-      );
-      await _insertPartnerLedger(
-        txn,
-        partnerKind: 'customer',
-        partnerId: cid,
-        entryType: 'customer_payment',
-        referenceType: 'customer_payment',
-        referenceId: paymentId,
-        amountSigned: -amount,
-        notes: notes.isEmpty ? 'دفعة عميل' : notes,
-        entryDate: when,
-        voucherNumber: voucherNumber,
-      );
-    });
+    final postResult = await TransactionPaymentSyncService(
+      databaseService: _databaseService,
+    ).createCustomerPaymentDraftAndPost(
+      paymentId: paymentId,
+      organizationId: s.organizationId,
+      branchId: s.branchId,
+      userId: s.userId,
+      customerId: cid,
+      amount: amount,
+      paymentDate: when,
+      paymentMethod: paymentMethod,
+      voucherNumber: voucherNumber,
+      notes: notes.isEmpty ? null : notes,
+    );
+    if (!postResult.ok) {
+      throw Exception(transactionPaymentPostFailureMessage(postResult));
+    }
     await _audit('create', 'customer_payment', paymentId, 'Customer payment $amount');
+    return paymentId;
   }
 
   /// صرف لمورد مع خصم ذمة المورد في دفتر الشركاء.
-  Future<void> recordSupplierPayment({
+  Future<String> recordSupplierPayment({
     required String supplierId,
     required double amount,
     String notes = '',
     DateTime? paymentDate,
     String? voucherNumber,
+    String paymentMethod = 'cash',
   }) async {
-    _mustSession();
     _requirePaidSubscription();
+    final s = _mustSession();
     final sid = supplierId.trim();
     if (sid.isEmpty) {
       throw Exception('معرف المورد غير صالح.');
@@ -9002,33 +8998,26 @@ class AccountingService {
       throw Exception('المبلغ يجب أن يكون أكبر من صفر.');
     }
     final paymentId = _uuid.v4();
-    final db = await _databaseService.database;
     final when = paymentDate ?? DateTime.now();
-    await db.transaction((txn) async {
-      await _insertCash(
-        txn,
-        CashTransactionInput(
-          type: 'out',
-          amount: amount,
-          description: notes.isEmpty ? 'سداد ذمة مورد' : notes,
-          referenceType: 'supplier_payment',
-          referenceId: paymentId,
-        ),
-      );
-      await _insertPartnerLedger(
-        txn,
-        partnerKind: 'supplier',
-        partnerId: sid,
-        entryType: 'supplier_payment',
-        referenceType: 'supplier_payment',
-        referenceId: paymentId,
-        amountSigned: -amount,
-        notes: notes.isEmpty ? 'دفعة مورد' : notes,
-        entryDate: when,
-        voucherNumber: voucherNumber,
-      );
-    });
+    final postResult = await TransactionPaymentSyncService(
+      databaseService: _databaseService,
+    ).createSupplierPaymentDraftAndPost(
+      paymentId: paymentId,
+      organizationId: s.organizationId,
+      branchId: s.branchId,
+      userId: s.userId,
+      supplierId: sid,
+      amount: amount,
+      paymentDate: when,
+      paymentMethod: paymentMethod,
+      voucherNumber: voucherNumber,
+      notes: notes.isEmpty ? null : notes,
+    );
+    if (!postResult.ok) {
+      throw Exception(transactionPaymentPostFailureMessage(postResult));
+    }
     await _audit('create', 'supplier_payment', paymentId, 'Supplier payment $amount');
+    return paymentId;
   }
 
   Future<bool> cancelLastManualCashTransactionByType(String type) async {

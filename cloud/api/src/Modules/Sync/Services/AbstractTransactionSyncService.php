@@ -288,6 +288,10 @@ abstract class AbstractTransactionSyncService
         }
 
         if ($entityType !== 'sales_invoice' && $entityType !== 'purchase_invoice') {
+            if (isset($payload['aggregate']) || ($payload['deleted'] ?? false) === true) {
+                return 'cancel';
+            }
+
             return $storedOperation;
         }
 
