@@ -1,5 +1,7 @@
 ﻿# GA Release Stamp
 version: 1.0.41+42
+git_commit: 59bafbd06a7da25867192083cd2b6ac3b5e5d35a
+git_commit_short: 59bafbd
 channel: production
 built_for: Desktop + Android + Backend
 notes: Monitoring + Ops Audit + Desktop parity + Admin module hygiene
