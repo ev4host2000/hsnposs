@@ -37,7 +37,38 @@ trait SalesInvoicePostLww
 
         $existing = $this->fetchSalesInvoiceRow($companyId, $entityId);
         if ($existing === null || ($existing['deleted_at'] ?? null) !== null) {
-            throw new HttpException('not_found', 'Draft invoice not found', 404);
+            // الترحيل وصل قبل create — أنشئ المسودة من حمولة post ثم أكمل.
+            $headerTxnForDraft = max(0, (int) ($header['transaction_version'] ?? 0));
+            $draftHeader = $header;
+            $draftHeader['status'] = 'draft';
+            $draftHeader['transaction_version'] = max(0, $headerTxnForDraft - 1);
+            $draftHeader['row_version'] = max(
+                1,
+                (int) ($header['row_version'] ?? $clientRowVersion) - 1,
+            );
+            try {
+                $this->applyDraftLww(
+                    $companyId,
+                    $branchId,
+                    $entityId,
+                    'create',
+                    [
+                        'aggregate' => [
+                            'header' => $draftHeader,
+                            'lines' => $lines,
+                            'metadata' => [],
+                        ],
+                    ],
+                    max(1, $clientRowVersion - 1),
+                    $originDeviceId,
+                );
+            } catch (HttpException $e) {
+                throw $e;
+            }
+            $existing = $this->fetchSalesInvoiceRow($companyId, $entityId);
+            if ($existing === null || ($existing['deleted_at'] ?? null) !== null) {
+                throw new HttpException('not_found', 'Draft invoice not found', 404);
+            }
         }
 
         $dbStatus = (string) ($existing['invoice_status'] ?? '');

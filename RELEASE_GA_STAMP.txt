@@ -1,0 +1,5 @@
+﻿# GA Release Stamp
+version: 1.0.41+42
+channel: production
+built_for: Desktop + Android + Backend
+notes: Monitoring + Ops Audit + Desktop parity + Admin module hygiene

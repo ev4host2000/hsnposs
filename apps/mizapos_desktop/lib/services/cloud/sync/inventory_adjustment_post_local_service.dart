@@ -69,7 +69,7 @@ class InventoryAdjustmentPostLocalService {
     }
 
     if (!idempotentReplay) {
-      await TransactionSyncOutboxWriter.record(
+      await TransactionSyncOutboxWriter.recordBestEffort(
         entityType: InventoryAdjustmentSyncConstants.entityType,
         operation: 'post',
         entityId: adjustmentId,

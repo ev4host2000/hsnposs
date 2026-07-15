@@ -4,12 +4,52 @@ declare(strict_types=1);
 
 namespace MizaCloud\Modules\Sync\Repositories;
 
+use MizaCloud\Modules\Sync\Contract\PatchValidator;
+use MizaCloud\Modules\Sync\Support\CatalogPatchOrchestrator;
+use MizaCloud\Modules\Sync\Support\NamedEntityLww;
+
 final class ProductCategoriesSyncRepository extends SyncRepositorySupport
 {
+    use NamedEntityLww;
+
     public const ENTITY_TYPE = 'product_category';
+
+    public function __construct(
+        \MizaCloud\Core\Database\Connection $db,
+        private readonly CatalogPatchOrchestrator $patchOrchestrator,
+    ) {
+        parent::__construct($db);
+    }
+
+    protected function namedPatchOrchestrator(): CatalogPatchOrchestrator
+    {
+        return $this->patchOrchestrator;
+    }
+
+    protected function namedEntityType(): string
+    {
+        return self::ENTITY_TYPE;
+    }
+
+    protected function namedEntityPath(): string
+    {
+        return PatchValidator::PATH_PRODUCT_CATEGORY_CATALOG_PATCH;
+    }
+
+    protected function namedTable(): string
+    {
+        return 'product_categories';
+    }
+
+    /** @return list<string> */
+    protected function namedPatchableColumns(): array
+    {
+        return ['name', 'sort_order'];
+    }
 
     /**
      * @param array<string, mixed> $payload
+     * @param array<string, mixed> $event
      * @return array<string, mixed>
      */
     public function applyCategoryLww(
@@ -20,59 +60,17 @@ final class ProductCategoriesSyncRepository extends SyncRepositorySupport
         array $payload,
         int $clientRowVersion,
         ?string $originDeviceId,
+        array $event = [],
     ): array {
-        if ($operation === 'delete') {
-            $deleted = $this->softDeleteRow('product_categories', $companyId, $entityId, $clientRowVersion);
-
-            return [
-                'id' => $entityId,
-                'company_id' => $companyId,
-                'branch_id' => $branchId,
-                'row_version' => $deleted['row_version'],
-                'deleted' => true,
-            ];
-        }
-
-        $name = trim((string) ($payload['name'] ?? ''));
-        $sortOrder = (int) ($payload['sort_order'] ?? 0);
-
-        $stmt = $this->db->pdo()->prepare(
-            'INSERT INTO product_categories (
-                id, company_id, branch_id, name, sort_order,
-                row_version, created_at, updated_at, deleted_at
-             ) VALUES (
-                :id, :company_id, :branch_id, :name, :sort_order,
-                :row_version, now(), now(), NULL
-             )
-             ON CONFLICT (id) DO UPDATE SET
-                name = EXCLUDED.name,
-                sort_order = EXCLUDED.sort_order,
-                row_version = GREATEST(product_categories.row_version, EXCLUDED.row_version),
-                updated_at = now(),
-                deleted_at = NULL
-             RETURNING row_version, name, sort_order',
+        return $this->applyNamedEntityLww(
+            $companyId,
+            $branchId,
+            $entityId,
+            $operation,
+            $payload,
+            $clientRowVersion,
+            $originDeviceId,
+            $event,
         );
-        $stmt->execute([
-            'id' => $entityId,
-            'company_id' => $companyId,
-            'branch_id' => $branchId,
-            'name' => $name,
-            'sort_order' => $sortOrder,
-            'row_version' => max(1, $clientRowVersion),
-        ]);
-        $row = $stmt->fetch(\PDO::FETCH_ASSOC);
-        if (!is_array($row)) {
-            throw new \RuntimeException('Product category upsert failed');
-        }
-
-        return [
-            'id' => $entityId,
-            'company_id' => $companyId,
-            'branch_id' => $branchId,
-            'name' => (string) $row['name'],
-            'sort_order' => (int) $row['sort_order'],
-            'row_version' => (int) $row['row_version'],
-            'deleted' => false,
-        ];
     }
 }

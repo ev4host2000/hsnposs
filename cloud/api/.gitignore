@@ -1,3 +1,7 @@
 /vendor/
 /storage/logs/*.log
 .env
+
+/tools/
+composer.phar
+

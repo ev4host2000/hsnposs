@@ -60,14 +60,29 @@ trait InventoryAdjustmentDraftLww
         }
 
         $existing = $this->fetchInventoryAdjustmentRow($companyId, $entityId);
+        // Idempotent create: already on server → success (do not rewrite posted rows).
         if ($operation === 'create' && $existing !== null && ($existing['deleted_at'] ?? null) === null) {
-            throw new HttpException('conflict', 'Adjustment already exists', 409);
+            $status = (string) ($existing['adjustment_status'] ?? 'draft');
+            $linesForEnvelope = is_array($lines) ? $lines : [];
+
+            return $this->buildAggregateEnvelope(
+                $companyId,
+                $branchId,
+                $entityId,
+                $header,
+                $linesForEnvelope,
+                $metadata,
+                (int) ($existing['row_version'] ?? $clientRowVersion),
+                (int) ($existing['transaction_version'] ?? 0),
+                $status !== '' ? $status : 'draft',
+                $originDeviceId,
+            );
         }
         if ($operation === 'update') {
             if ($existing === null || ($existing['deleted_at'] ?? null) !== null) {
-                throw new HttpException('not_found', 'Draft adjustment not found', 404);
-            }
-            if (($existing['adjustment_status'] ?? '') !== 'draft') {
+                // تحديث لمسودة غير موجودة بعد — عاملها كإنشاء.
+                $operation = 'create';
+            } elseif (($existing['adjustment_status'] ?? '') !== 'draft') {
                 throw new HttpException('adjustment_not_editable', 'Only draft adjustments can be updated', 409);
             }
         }

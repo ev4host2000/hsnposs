@@ -1,0 +1,48 @@
+{
+  "entity_type": "price_list",
+  "fields": [
+    {
+      "name": "name",
+      "type": "string",
+      "nullable": false,
+      "default_value": null,
+      "comparison_rule": "string_default",
+      "security_level": "staff",
+      "patchable": true,
+      "syncable": true,
+      "searchable": true,
+      "sortable": true,
+      "localized": false,
+      "deprecated": false,
+      "empty_as_null": false
+    },
+    {
+      "name": "is_default",
+      "type": "boolean",
+      "nullable": false,
+      "default_value": false,
+      "comparison_rule": "boolean_default",
+      "security_level": "staff",
+      "patchable": true,
+      "syncable": true,
+      "searchable": false,
+      "sortable": true,
+      "localized": false,
+      "deprecated": false
+    },
+    {
+      "name": "sort_order",
+      "type": "integer",
+      "nullable": false,
+      "default_value": 0,
+      "comparison_rule": "integer_default",
+      "security_level": "staff",
+      "patchable": true,
+      "syncable": true,
+      "searchable": false,
+      "sortable": true,
+      "localized": false,
+      "deprecated": false
+    }
+  ]
+}

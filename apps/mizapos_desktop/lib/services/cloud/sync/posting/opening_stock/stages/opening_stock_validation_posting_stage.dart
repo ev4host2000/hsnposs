@@ -111,10 +111,9 @@ class OpeningStockValidationPostingStage extends PostingStage {
       txn,
       openingStockId,
     )) {
-      return const PostingStageResult.failure(
-        code: 'post_effects_exist',
-        message: 'Stock movements already exist for this opening stock',
-      );
+      context.stageData['idempotent_replay'] = true;
+      _loadPlannedEffects(context);
+      return const PostingStageResult.proceed();
     }
 
     if (!await OpeningStockPostDb.productExists(txn, productId)) {

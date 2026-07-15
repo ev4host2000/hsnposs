@@ -52,8 +52,70 @@ class AppLocalizations {
         return navInventory;
       case 'queries':
         return navQueries;
+      case 'miza_cloud':
+        return menuMizaCloud;
+      case 'quick_notes':
+        return homeQuickNotesTitle;
       default:
         return key;
+    }
+  }
+
+  /// وصف قصير تحت عنوان مربّع لوحة التحكم (واجهة فقط).
+  String dashboardTileSubtitle(String key) {
+    switch (key) {
+      case 'sales':
+        return _t(
+          'إنشاء فواتير البيع والمرتجعات والتحصيل',
+          'Create sales invoices, returns, and collections',
+        );
+      case 'purchases':
+        return _t(
+          'فواتير الشراء والمرتجعات ومدفوعات الموردين',
+          'Purchase invoices, returns, and supplier payments',
+        );
+      case 'customers':
+        return _t(
+          'إدارة بيانات العملاء والأرصدة والفواتير',
+          'Manage customers, balances, and invoices',
+        );
+      case 'suppliers':
+        return _t(
+          'بيانات الموردين والمشتريات والمدفوعات',
+          'Suppliers, purchases, and payments',
+        );
+      case 'cash':
+        return _t(
+          'إدارة حركة الصندوق والإيرادات والمصروفات',
+          'Cash movements, income, and expenses',
+        );
+      case 'expenses':
+        return _t(
+          'تسجيل ومتابعة مصاريف التشغيل اليومية',
+          'Record and track daily operating expenses',
+        );
+      case 'inventory':
+        return _t(
+          'متابعة الأصناف والكميات والحركات',
+          'Track items, quantities, and stock movements',
+        );
+      case 'queries':
+        return _t(
+          'تقارير وإحصائيات وتحليلات النظام',
+          'Reports, statistics, and system analytics',
+        );
+      case 'miza_cloud':
+        return _t(
+          'مزامنة البيانات بين جميع الأجهزة',
+          'Sync data across all your devices',
+        );
+      case 'quick_notes':
+        return _t(
+          'تسجيل الملاحظات والمهام اليومية',
+          'Capture daily notes and tasks',
+        );
+      default:
+        return '';
     }
   }
 
@@ -155,10 +217,46 @@ class AppLocalizations {
       _t('مفكرة ملاحظات سريعة', 'Quick notepad');
   String get homeQuickNotesTitle => _t('مفكرة سريعة', 'Quick notepad');
   String get homeQuickNotesHint => _t(
-        'نواقص، طلبات، ملاحظات زبائن…',
-        'Shortages, orders, customer notes…',
+        'اكتب تفاصيل الملاحظة هنا… نواقص، طلبات، ملاحظات زبائن',
+        'Write note details… shortages, orders, customer notes',
       );
   String get homeQuickNotesSaved => _t('تم حفظ الملاحظات.', 'Notes saved.');
+  String get quickNotesSmartSubtitle =>
+      _t('ملاحظات مرتّبة وقابلة للتثبيت', 'Organized, pinnable notes');
+  String get quickNotesSearchHint =>
+      _t('بحث في الملاحظات…', 'Search notes…');
+  String get quickNotesNew => _t('ملاحظة جديدة', 'New note');
+  String get quickNotesEmptyList =>
+      _t('لا توجد ملاحظات مطابقة', 'No matching notes');
+  String get quickNotesTitleHint =>
+      _t('عنوان الملاحظة', 'Note title');
+  String get quickNotesPickOrCreate => _t(
+        'اختر ملاحظة أو أنشئ واحدة جديدة',
+        'Pick a note or create a new one',
+      );
+  String get quickNotesPin => _t('تثبيت', 'Pin');
+  String get quickNotesUnpin => _t('إلغاء التثبيت', 'Unpin');
+  String get quickNotesDeleteTitle =>
+      _t('حذف الملاحظة؟', 'Delete note?');
+  String get quickNotesDeleteBody => _t(
+        'سيتم حذف هذه الملاحظة نهائياً.',
+        'This note will be permanently deleted.',
+      );
+  String get quickNotesLimitReached => _t(
+        'وصلت إلى الحد الأقصى لعدد الملاحظات.',
+        'You reached the maximum number of notes.',
+      );
+  String get quickNotesTagGeneral => _t('عام', 'General');
+  String get quickNotesTagShortage => _t('نقص', 'Shortage');
+  String get quickNotesTagOrder => _t('طلب', 'Order');
+  String get quickNotesTagCustomer => _t('زبون', 'Customer');
+  String get quickNotesJustNow => _t('الآن', 'Just now');
+  String quickNotesMinutesAgo(int m) =>
+      _t('منذ $m د', '$m min ago');
+  String quickNotesHoursAgo(int h) =>
+      _t('منذ $h س', '$h h ago');
+  String quickNotesDaysAgo(int d) =>
+      _t('منذ $d ي', '$d d ago');
 
   String get homeDistributorsHubTitle =>
       _t('منظومة الموزعون', 'Distributors hub');
@@ -211,8 +309,8 @@ class AppLocalizations {
       _t('جوال أندرويد', 'Android mobile');
 
   String get subscriptionPlanFootnote => _t(
-        'اشتراك سنوي واحد يشمل نسخة الحاسوب ونسخة الجوال لنفس الحساب. التجربة المجانية كما هي. التفعيل عبر قسيمة Miza-XXXX بعد إنشاء الحساب.',
-        'One annual subscription covers desktop and mobile for the same account. Free trial unchanged. Activate with a Miza-XXXX voucher after signup.',
+        'اشتراك سنوي واحد يشمل نسخة الحاسوب ونسخة الجوال لنفس الحساب.',
+        'One annual subscription covers desktop and mobile for the same account.',
       );
 
   String get subscriptionPlanCloudAddonTitle => _t(
@@ -1193,6 +1291,10 @@ class AppLocalizations {
         'حفظ بيانات تسجيل الدخول',
         'Remember sign-in',
       );
+  String get voucherSubscribeAgentsLink => _t(
+        'للإشتراك اضغط هنا',
+        'To subscribe, tap here',
+      );
   String get voucherActionRegister =>
       _t('إنشاء الحساب وحفظ الجلسة', 'Create account & sign in');
   String get voucherActionRedeem => _t('تفعيل بالقسيمة', 'Redeem voucher');
@@ -1401,8 +1503,16 @@ class AppLocalizations {
   String get subscriberAccountHeroBadge =>
       _t('اشتراك مُفعَّل', 'Active subscription');
 
+  /// شارة واضحة: حساب على فترة تجربة (وليس اشتراكاً سنوياً مدفوعاً).
+  String get subscriberAccountHeroBadgeTrial =>
+      _t('حساب تجربة', 'Trial account');
+
+  /// شارة واضحة: اشتراك سنوي مدفوع ومفعّل.
+  String get subscriberAccountHeroBadgeAnnual =>
+      _t('اشتراك سنوي مفعّل', 'Annual subscription active');
+
   String get subscriberAccountHeroBadgePending =>
-      _t('بانتظار التفعيل', 'Pending activation');
+      _t('بانتظار التفعيل السنوي', 'Awaiting annual activation');
 
   String get subscriberAccountHeroBadgeRevoked =>
       _t('الاشتراك معلَّق', 'Subscription suspended');
@@ -1412,10 +1522,64 @@ class AppLocalizations {
         'Glad to have you. Your subscription is active on this device.',
       );
 
-  String get subscriberAccountHeroSubtitleInactive => _t(
-        'سجّل قسيمة لتفعيل البرنامج على هذا الجهاز.',
-        'Redeem a voucher to activate the app on this device.',
+  String subscriberAccountHeroSubtitleTrial(int days) => _en
+      ? 'This is a trial account — $days day(s) remaining. Activate the annual plan for uninterrupted access.'
+      : 'هذا حساب تجربة — متبقٍ $days يوماً. فعّل الاشتراك السنوي لاستمرار الوصول دون انقطاع.';
+
+  String get subscriberAccountHeroSubtitleAnnual => _t(
+        'حساب مفعّل باشتراك سنوي على هذا الجهاز.',
+        'This account has an active annual subscription on this device.',
       );
+
+  String get subscriberAccountHeroSubtitleInactive => _t(
+        'الحساب مسجّل لكن الاشتراك السنوي غير مفعّل بعد. أكمل التفعيل من الصفحة الرئيسية.',
+        'Account is signed in, but the annual subscription is not activated yet. Complete activation from the home screen.',
+      );
+
+  // --- بطاقة تغطية الاشتراك (تجربة / سنوي) ---
+
+  String get subscriptionCoverageTrialEyebrow =>
+      _t('وضع التجربة', 'Trial mode');
+
+  String get subscriptionCoverageTrialTitle =>
+      _t('نسخة تجربة نشطة', 'Active trial edition');
+
+  String subscriptionCoverageTrialBody(int days) => _en
+      ? 'You are on a trial — not a paid annual plan. $days day(s) left. Contact an agent to activate the official yearly subscription.'
+      : 'أنت على نسخة تجربة — وليست اشتراكاً سنوياً مدفوعاً. متبقٍ $days يوماً. تواصل مع وكيل لتفعيل الاشتراك السنوي الرسمي.';
+
+  String get subscriptionCoverageAnnualEyebrow =>
+      _t('تفعيل رسمي', 'Official activation');
+
+  String get subscriptionCoverageAnnualTitle =>
+      _t('اشتراك سنوي مفعّل', 'Annual subscription active');
+
+  String get subscriptionCoverageAnnualBody => _t(
+        'تم تفعيل البرنامج رسمياً لسنة كاملة على هذا الحساب والجهاز.',
+        'The program is officially activated for a full year on this account and device.',
+      );
+
+  String subscriptionCoverageAnnualBodyUntil(String date) => _en
+      ? 'Official yearly activation is active until $date.'
+      : 'التفعيل السنوي الرسمي ساري حتى $date.';
+
+  String get subscriptionCoverageAnnualPill =>
+      _t('لمدة سنة', '1 year');
+
+  String subscriptionCoverageDaysLeft(int days) =>
+      _en ? '$days d left' : '$days يوم';
+
+  String get subscriptionCoverageAgentsCta =>
+      _t('وكلاؤنا — للتفعيل السنوي', 'Our agents — annual activation');
+
+  String get subscriptionCoverageAnnualContinue =>
+      _t('متابعة العمل', 'Continue');
+
+  String get activationCelebrationTrialHeadline =>
+      _t('مرحباً بك في نسخة التجربة', 'Welcome to the trial edition');
+
+  String get activationCelebrationAnnualHeadline =>
+      _t('تم التفعيل السنوي بنجاح', 'Annual activation complete');
 
   String get subscriberAccountSectionDetails =>
       _t('بيانات المشترك', 'Subscriber details');
@@ -1448,8 +1612,8 @@ class AppLocalizations {
       _t('تسجيل خروج من حساب المشترك', 'Sign out of subscriber account');
 
   String get subscriberAccountSignOutHint => _t(
-        'سيؤدي تسجيل الخروج إلى إزالة جلسة المشترك من هذا الجهاز وإتاحة دخول أعضاء فريق العمل.',
-        'Signing out clears the subscriber session on this device and lets team members sign in.',
+        'يُتيح تسجيل الخروج دخول فريق العمل على هذا الجهاز.',
+        'Signing out lets team members sign in on this device.',
       );
 
   String get subscriberAccountSignOutConfirmTitle =>
@@ -1706,12 +1870,25 @@ class AppLocalizations {
         'يمكنك إغلاق هذا الحوار وتجربة البرنامج الآن بصلاحيات محدودة، أو المتابعة لطلب تفعيل الاشتراك بإدخال رمز القسيمة الذي تحصل عليه من مطوّر البرنامج.',
         'You can close this dialog and try the app now with limited features, or continue to activate your subscription by entering the voucher code you receive from the developer.',
       );
+  String authSubscriberWelcomeBodyEmailTrial(int days) => _en
+      ? 'You have a free $days-day trial with full access to all core POS features (sales, inventory, purchases, reports, and more). Cloud subscriptions are not included during the trial.'
+      : 'لديك تجربة مجانية لمدة $days ${days == 1 ? 'يوم' : 'أيام'} — وصول كامل لكل ميزات البرنامج الأساسية (مبيعات، مخزون، مشتريات، تقارير، وغيرها). اشتراكات السحابة غير مشمولة أثناء التجربة.';
+  String authSubscriberWelcomeTrialBadge(int days) => _en
+      ? '$days-day full trial'
+      : 'تجربة كاملة — $days ${days == 1 ? 'يوم' : 'أيام'}';
   String get authSubscriberWelcomeTryApp =>
-      _t('تجربة البرنامج', 'Try the app');
+      _t('ابدأ التجربة المجانية', 'Start free trial');
   String get authSubscriberWelcomeActivateVoucher => _t(
-        'طلب قسيمة وتفعيل',
-        'Request voucher & activate',
+        'لدي قسيمة — تفعيل الاشتراك',
+        'I have a voucher — activate',
       );
+  String get authSubscriberTrialActiveTitle =>
+      _t('تجربتك نشطة', 'Your trial is active');
+  String authSubscriberTrialActiveBody(int days) => _en
+      ? 'You have $days ${days == 1 ? 'day' : 'days'} left with full access to all core POS features. Cloud subscriptions are not included during the trial.'
+      : 'متبقٍ $days ${days == 1 ? 'يوم' : 'أيام'} على تجربتك — وصول كامل لكل ميزات البرنامج الأساسية. اشتراكات السحابة غير مشمولة.';
+  String get authSubscriberTrialActiveContinue =>
+      _t('متابعة إلى البرنامج', 'Continue to the app');
   String get authBackToLogin => _t('العودة لتسجيل الدخول', 'Back to sign in');
   String get authLoginNow => _t('تسجيل الدخول الآن', 'Sign in now');
   String get authResetPasswordTitle =>
@@ -2391,8 +2568,8 @@ class AppLocalizations {
   String get featureRequiresActivationTitle =>
       _t('ميزة مرتبطة بالاشتراك', 'Subscription required');
   String get featureRequiresActivationBody => _t(
-        'هذه الميزة متاحة فقط للأجهزة المُفعَّلة. فعِّل البرنامج بقسيمة اشتراك سارية لاستخدامها.',
-        'This feature is available only for activated devices. Activate the program with a valid subscription voucher to use it.',
+        'هذه الميزة متاحة فقط للأجهزة المُفعَّلة، فعّل البرنامج لاستخدامها.',
+        'This feature is available only for activated devices. Activate the program to use it.',
       );
   String get featureRequiresActivationCta =>
       _t('تفعيل الاشتراك', 'Activate subscription');
@@ -2555,7 +2732,7 @@ class AppLocalizations {
       );
 
   String get sessionIdentityTapTooltip =>
-      _t('الحساب والدور — اضغط للتبديل', 'Account & role — tap to switch');
+      _t('حسابي — اضغط لفتح صفحة الحساب', 'My account — tap to open');
 
   String get sessionIdentitySheetTitle => _t('تسجيل الدخول', 'Sign in');
 
@@ -2741,6 +2918,589 @@ class AppLocalizations {
   String get settingsNavStock => _t('المخزون', 'Stock');
   String get settingsNavHome => _t('الرئيسية', 'Dashboard');
   String get settingsNavData => _t('البيانات', 'Data');
+  String get mizaCloudScreenTitle => _t('ميزا كلاود', 'Miza Cloud');
+  String get mizaCloudComingSoonNote => _t(
+        'الإشتراك في هذه الخدمة سيتوفر قريباً.',
+        'Subscription to this service will be available soon.',
+      );
+  String get mizaCloudOpenFromSettings => _t('ميزا كلاود', 'Miza Cloud');
+  String get cloudSyncEnabledTitle => _t(
+        'تفعيل المزامنة السحابية',
+        'Enable cloud sync',
+      );
+  String get cloudSyncEnabledSubtitle => _t(
+        'مزامنة تلقائية للمنتجات والمعاملات عند توفر الإنترنت.',
+        'Automatically sync products and transactions when online.',
+      );
+  String get cloudSyncWifiOnlyTitle => _t(
+        'المزامنة على WiFi فقط',
+        'Sync on WiFi only',
+      );
+  String get cloudSyncWifiOnlySubtitle => _t(
+        'لا تُزامن على بيانات الجوال أو الاتصال المقيد — يشمل المزامنة التلقائية.',
+        'Skip mobile data and constrained links — includes automatic sync.',
+      );
+  String get cloudLoginTitle =>
+      _t('تسجيل دخول Miza Cloud', 'Miza Cloud sign-in');
+  String get cloudLoginHero => _t(
+        'سجّل الدخول إلى حساب Miza Cloud لمزامنة بيانات متجرك بين جميع أجهزتك',
+        'Sign in to your Miza Cloud account to sync your store data across all your devices',
+      );
+  String get cloudLoginResetSentBody => _t(
+        'تم إرسال كلمة مرور مؤقتة إلى بريدك. استخدمها لتسجيل الدخول إلى Miza Cloud.',
+        'A temporary password was sent to your email. Use it to sign in to Miza Cloud.',
+      );
+  String get cloudLoginSubtitle => _t(
+        'أدخل بيانات حساب السحابة — منفصلة عن دخول الموظفين المحلي.',
+        'Enter your cloud account credentials — separate from local staff login.',
+      );
+  String get cloudLoginSelectStoreTitle =>
+      _t('اختر المتجر', 'Select store');
+  String get cloudLoginEmail => _t('البريد الإلكتروني', 'Email');
+  String get cloudLoginPassword => _t('كلمة المرور', 'Password');
+  String get cloudLoginSubmit => _t('تسجيل الدخول', 'Sign in');
+  String get cloudLoginValidationEmpty => _t(
+        'أدخل البريد وكلمة المرور.',
+        'Enter email and password.',
+      );
+  String get cloudLoginTenantIdsRequired => _t(
+        'أدخل معرّف الشركة والفرع (مطلوب لهذا الحساب).',
+        'Enter company and branch IDs (required for this account).',
+      );
+  String get cloudLoginInvalidCredentials => _t(
+        'بيانات الدخول غير صحيحة.\nتأكد أنك تستخدم كلمة مرور حساب Miza Cloud — وليست كلمة مرور البرنامج المحلي أو بوابة التفعيل.\nإن لم تتذكرها: «نسيت كلمة المرور».',
+        'Invalid sign-in credentials.\nUse your Miza Cloud password — not the local app or activation portal password.\nIf you forgot it, use «Forgot password».',
+      );
+  String get cloudLoginDeviceNotRegistered => _t(
+        'الجهاز غير مسجّل — أكمل خطوة ربط الجهاز.',
+        'Device not registered — complete device pairing.',
+      );
+  String get cloudLoginCompanySuspended => _t(
+        'حساب المتجر موقوف.',
+        'Store account is suspended.',
+      );
+  String get cloudLoginAccountDisabled => _t(
+        'الحساب معطّل.',
+        'Account is disabled.',
+      );
+  String get cloudLoginForbidden => _t(
+        'لا صلاحية للوصول إلى هذا الفرع.',
+        'No access to this branch.',
+      );
+  String get cloudLoginFailed => _t(
+        'تعذّر تسجيل الدخول.',
+        'Sign-in failed.',
+      );
+  String get cloudLoginTenantIdsToggle => _t(
+        'معرّفات المتجر (متقدم)',
+        'Store IDs (advanced)',
+      );
+  String get cloudLoginCompanyId => _t('معرّف الشركة', 'Company ID');
+  String get cloudLoginBranchId => _t('معرّف الفرع', 'Branch ID');
+  String get cloudDeviceSetupTitle =>
+      _t('ربط الجهاز', 'Pair this device');
+  String get cloudDeviceSetupHero => _t(
+        'سجّل هذا الجهاز على السحابة',
+        'Register this device on the cloud',
+      );
+  String get cloudDeviceSetupSubtitle => _t(
+        'سيظهر الجهاز في قائمة أجهزة المتجر ويمكنه المزامنة.',
+        'This device will appear in your store device list and can sync.',
+      );
+  String get cloudDeviceNameRequired => _t(
+        'أدخل اسماً للجهاز.',
+        'Enter a device name.',
+      );
+  String cloudDevicePlatformHint(String platform) => _t(
+        'المنصة: $platform',
+        'Platform: $platform',
+      );
+  String get cloudDeviceRegisterSubmit =>
+      _t('ربط الجهاز الآن', 'Pair device now');
+  String get cloudDeviceLimitReached => _t(
+        'تم بلوغ حد الأجهزة في خطتك.',
+        'Device limit reached for your plan.',
+      );
+  String get cloudDeviceInstallationConflict => _t(
+        'معرّف التثبيت مرتبط بمتجر آخر.',
+        'Installation ID belongs to another store.',
+      );
+  String get cloudDeviceRevoked => _t(
+        'هذا الجهاز ملغى — تواصل مع الدعم.',
+        'This device is revoked — contact support.',
+      );
+  String get cloudDeviceRegisterFailed => _t(
+        'تعذّر ربط الجهاز.',
+        'Device pairing failed.',
+      );
+  String get cloudLogout => _t('خروج من السحابة', 'Cloud sign-out');
+  String get mizaCloudOpenHint => _t(
+        'حالة الاتصال، آخر مزامنة، والعمليات المعلقة.',
+        'Connection status, last sync, and pending operations.',
+      );
+  String get mizaCloudRefresh => _t('تحديث', 'Refresh');
+  String get mizaCloudNotInitialized => _t(
+        'محرك المزامنة غير مهيأ على هذا الجهاز.',
+        'Sync engine is not initialized on this device.',
+      );
+  String get mizaCloudConnected => _t('متصل', 'Connected');
+  String get mizaCloudDisconnected => _t('غير متصل', 'Disconnected');
+  String get mizaCloudSectionDevice => _t('بيانات الجهاز', 'Device');
+  String get mizaCloudDeviceName => _t('اسم الجهاز', 'Device name');
+  String get mizaCloudDeviceId => _t('Device ID', 'Device ID');
+  String get mizaCloudSectionAccount => _t('بيانات الحساب', 'Account');
+  String get mizaCloudAccountEmail => _t('البريد الإلكتروني', 'Email');
+  String get mizaCloudStoreName => _t('اسم المتجر', 'Store name');
+  String get mizaCloudSectionLastSync => _t('آخر مزامنة', 'Last sync');
+  String get mizaCloudLastSyncDate => _t('التاريخ', 'Date');
+  String get mizaCloudLastSyncTime => _t('الوقت', 'Time');
+  String get mizaCloudSectionPending =>
+      _t('العمليات المعلقة', 'Pending operations');
+  String get mizaCloudPendingPush => _t('بانتظار الرفع', 'Pending upload');
+  String get mizaCloudOutboxFailed =>
+      _t('فشل في الإرسال', 'Send failures');
+  String get mizaCloudSectionFailedDetails =>
+      _t('العمليات الفاشلة', 'Failed operations');
+  String get mizaCloudFailedType => _t('النوع', 'Type');
+  String get mizaCloudFailedError => _t('سبب الخطأ', 'Error');
+  String mizaCloudFailedGroupSummary({
+    required String entityType,
+    required int count,
+    required String error,
+  }) =>
+      _t(
+        '${mizaCloudOutboxEntityType(entityType)} ×$count — $error',
+        '${mizaCloudOutboxEntityType(entityType)} ×$count — $error',
+      );
+  String mizaCloudFailedMore(int count) =>
+      _t('+$count أخرى', '+$count more');
+  String get mizaCloudRepairFailedButton =>
+      _t('إصلاح العمليات الفاشلة', 'Fix failed operations');
+  String mizaCloudRepairFailedDone(int count) => _t(
+        'تم إصلاح $count عملية — جارٍ المزامنة…',
+        'Repaired $count operation(s) — syncing…',
+      );
+  String get mizaCloudRepairFailedNothing => _t(
+        'لا توجد عمليات قابلة للإصلاح تلقائياً.',
+        'No operations could be repaired automatically.',
+      );
+  String mizaCloudOutboxEntityType(String type) {
+    switch (type) {
+      case 'product':
+        return _t('منتج', 'Product');
+      case 'product_category':
+        return _t('تصنيف منتج', 'Product category');
+      case 'product_unit':
+        return _t('وحدة قياس', 'Product unit');
+      case 'tax':
+        return _t('ضريبة', 'Tax');
+      case 'price_list':
+        return _t('قائمة أسعار', 'Price list');
+      case 'customer':
+        return _t('عميل', 'Customer');
+      case 'supplier':
+        return _t('مورد', 'Supplier');
+      case 'sales_invoice':
+        return _t('فاتورة مبيعات', 'Sales invoice');
+      case 'purchase_invoice':
+        return _t('فاتورة مشتريات', 'Purchase invoice');
+      case 'sales_return':
+        return _t('مرتجع مبيعات', 'Sales return');
+      case 'purchase_return':
+        return _t('مرتجع مشتريات', 'Purchase return');
+      case 'customer_payment':
+        return _t('دفعة عميل', 'Customer payment');
+      case 'supplier_payment':
+        return _t('دفعة مورد', 'Supplier payment');
+      case 'inventory_adjustment':
+        return _t('تسوية مخزون', 'Inventory adjustment');
+      case 'opening_stock':
+        return _t('رصيد افتتاحي', 'Opening stock');
+      case 'cash_movement':
+      case 'cash':
+        return _t('حركة صندوق', 'Cash movement');
+      case 'expense':
+        return _t('مصروف', 'Expense');
+      default:
+        return type;
+    }
+  }
+
+  String mizaCloudOutboxOperation(String operation) {
+    switch (operation) {
+      case 'create':
+        return _t('إنشاء', 'Create');
+      case 'update':
+        return _t('تعديل', 'Update');
+      case 'post':
+        return _t('ترحيل', 'Post');
+      case 'cancel':
+        return _t('إلغاء', 'Cancel');
+      case 'void':
+        return _t('إبطال', 'Void');
+      case 'delete':
+        return _t('حذف', 'Delete');
+      default:
+        return operation;
+    }
+  }
+
+  String mizaCloudOutboxErrorLabel(String code) {
+    switch (code) {
+      case 'validation_error':
+      case 'validation_failed':
+        return _t('بيانات غير صالحة', 'Invalid data');
+      case 'invalid_request':
+      case 'invalid_payload':
+      case 'bad_request':
+        return _t('طلب غير صالح', 'Invalid request');
+      case 'unauthorized':
+        return _t('غير مصرّح', 'Unauthorized');
+      case 'forbidden':
+        return _t('ممنوع', 'Forbidden');
+      case 'push_failed':
+        return _t('فشل الرفع', 'Upload failed');
+      case 'pull_failed':
+        return _t('فشل التنزيل', 'Download failed');
+      case 'push_no_progress':
+        return _t('توقف الرفع بدون تقدّم', 'Upload stuck with no progress');
+      case 'product_not_found':
+        return _t(
+          'المنتج غير موجود على السحابة بعد — اضغط «إصلاح» ثم زامن',
+          'Product not on cloud yet — tap Repair then sync',
+        );
+      case 'not_found':
+      case 'invoice_not_found':
+      case 'draft_not_found':
+        return _t(
+          'الفاتورة غير موجودة على السحابة بعد — اضغط «إصلاح» ثم زامن',
+          'Invoice not on cloud yet — tap Repair then sync',
+        );
+      case 'insufficient_stock':
+        return _t(
+          'المخزون غير كافٍ على السحابة — راجع الكميات ثم أعد المحاولة',
+          'Insufficient cloud stock — check quantities then retry',
+        );
+      case 'push_rejected':
+      case 'partial_reject':
+        return _t(
+          'رُفض جزء من الدفعة على السحابة — راجع التفاصيل الفاشلة',
+          'Part of the batch was rejected on cloud — check failed details',
+        );
+      case 'push_partial':
+        return _t(
+          'قبول جزئي غامض — ستُعاد المحاولة تلقائياً',
+          'Ambiguous partial accept — will retry automatically',
+        );
+      case 'apply_failed':
+        return _t(
+          'فشل تطبيق الحدث على السحابة',
+          'Failed to apply event on cloud',
+        );
+      case 'partner_not_found':
+      case 'customer_not_found':
+      case 'supplier_not_found':
+        return _t(
+          'العميل/المورد غير موجود على السحابة بعد',
+          'Customer/supplier not on cloud yet',
+        );
+      case 'category_not_found':
+        return _t('التصنيف غير موجود على السحابة', 'Category not on cloud');
+      case 'internal_error':
+        return _t('خطأ داخلي في السحابة', 'Cloud internal error');
+      case 'create_version_conflict':
+        return _t(
+          'تعارض إصدار: جهاز آخر عدّل نفس السجل — سيتم اعتماد الأحدث بعد السحب',
+          'Version conflict: another device changed the same record — latest wins after pull',
+        );
+      case 'conflict':
+        return _t(
+          'تعارض: السجل موجود مسبقاً على السحابة — سيتم تجاهل التكرار',
+          'Conflict: record already exists on cloud — duplicate will be ignored',
+        );
+      case 'posting_conflict':
+        return _t(
+          'تعارض عند الترحيل: الفاتورة قد تكون مرحّلة مسبقاً على جهاز آخر',
+          'Posting conflict: invoice may already be posted on another device',
+        );
+      case 'offline_during_retry':
+      case 'offline':
+        return _t('لا يوجد اتصال بالإنترنت', 'No internet connection');
+      case 'unknown':
+        return _t('سبب غير معروف', 'Unknown reason');
+      default:
+        final lower = code.toLowerCase();
+        if (lower.contains('unique constraint failed') &&
+            lower.contains('sync_meta')) {
+          return _t(
+            'تعارض مؤقت في حالة المزامنة — أعد المحاولة',
+            'Temporary sync-state conflict — please retry',
+          );
+        }
+        if (lower.contains('no such table') ||
+            lower.contains('sqliteexception') ||
+            lower.contains('sqlite_error')) {
+          return _t(
+            'قاعدة البيانات تحتاج تحديثاً — أعد تشغيل البرنامج ثم زامن',
+            'Database needs an update — restart the app then sync',
+          );
+        }
+        if (code.length > 120) {
+          return '${code.substring(0, 117)}…';
+        }
+        return code;
+    }
+  }
+
+  String get mizaCloudSectionHealth =>
+      _t('صحة المزامنة', 'Sync health');
+  String get mizaCloudHealthOk =>
+      _t('مكتمل وجاهز', 'Complete and ready');
+  String get mizaCloudHealthPending =>
+      _t('بانتظار رفع بيانات', 'Waiting to upload data');
+  String get mizaCloudHealthFailed =>
+      _t('يحتاج إصلاح', 'Needs repair');
+  String get mizaCloudHealthOffline =>
+      _t('غير متصل', 'Offline');
+  String get mizaCloudHealthSyncing =>
+      _t('جارٍ المزامنة…', 'Syncing…');
+  String mizaCloudHealthCounts({
+    required int products,
+    required int customers,
+    required int invoices,
+  }) =>
+      _t(
+        'محلياً: $products منتج · $customers عميل · $invoices فاتورة',
+        'Local: $products products · $customers customers · $invoices invoices',
+      );
+
+  String get mizaCloudRestoreButton =>
+      _t('استعادة من السحابة', 'Restore from cloud');
+  String get mizaCloudRestoreTitle =>
+      _t('استعادة جهاز جديد', 'New device restore');
+  String get mizaCloudRestoreBody => _t(
+        'سيتم تنزيل بيانات حسابك من السحابة إلى هذا الجهاز (منتجات، عملاء، فواتير…).',
+        'Your cloud account data will be downloaded to this device (products, customers, invoices…).',
+      );
+  String get mizaCloudRestoreStart => _t('ابدأ الاستعادة', 'Start restore');
+  String get mizaCloudRestoreWorking =>
+      _t('جارٍ الاستعادة من السحابة…', 'Restoring from cloud…');
+  String mizaCloudRestoreDone({
+    required int products,
+    required int customers,
+    required int invoices,
+  }) =>
+      _t(
+        'تمت الاستعادة.\nمنتجات: $products\nعملاء: $customers\nفواتير: $invoices',
+        'Restore complete.\nProducts: $products\nCustomers: $customers\nInvoices: $invoices',
+      );
+  String get mizaCloudRestoreEmptyHint => _t(
+        'هذا الجهاز فارغ تقريباً — يمكنك استعادة البيانات من السحابة.',
+        'This device is nearly empty — you can restore data from the cloud.',
+      );
+
+  String get mizaCloudSectionActivity =>
+      _t('آخر نشاط', 'Recent activity');
+  String mizaCloudActivityPush(int count) =>
+      _t('تم رفع $count عنصر', 'Uploaded $count item(s)');
+  String mizaCloudActivityPull(int count) =>
+      _t('تم تنزيل $count عنصر', 'Downloaded $count item(s)');
+  String get mizaCloudActivityPushStarted =>
+      _t('بدء الرفع…', 'Upload started…');
+  String get mizaCloudActivityPullStarted =>
+      _t('بدء التنزيل…', 'Download started…');
+  String mizaCloudActivityRetry(int attempt) =>
+      _t('إعادة محاولة ($attempt)', 'Retry ($attempt)');
+  String mizaCloudActivityError(String detail) =>
+      _t('خطأ: $detail', 'Error: $detail');
+  String mizaCloudSelfCheckImages(int count) => _t(
+        'صور بانتظار الرفع: $count',
+        'Images waiting to upload: $count',
+      );
+  String get mizaCloudSelfCheckOk => _t(
+        'الفحص الذاتي: لا توجد فجوات ظاهرة',
+        'Self-check: no obvious gaps',
+      );
+  String get mizaCloudSelfCheckNeedsRepair => _t(
+        'الفحص الذاتي: توجد عمليات فاشلة تحتاج إصلاحاً',
+        'Self-check: failed operations need repair',
+      );
+  String get mizaCloudSelfCheckPending => _t(
+        'الفحص الذاتي: ما زال هناك بيانات بانتظار الرفع',
+        'Self-check: data still waiting to upload',
+      );
+  String get mizaCloudSelfCheckConflict => _t(
+        'الفحص الذاتي: تعارض مع جهاز آخر — اسحب ثم أصلح',
+        'Self-check: conflict with another device — pull then repair',
+      );
+  String mizaCloudSelfCheckDeferred(int count) => _t(
+        'بانتظار اعتماد $count عنصر من السحابة (نواقص محلية)',
+        '$count cloud items waiting on local dependencies',
+      );
+  String get mizaCloudHealthPartial =>
+      _t('مزامنة جزئية — أكمل الدورة', 'Partial sync — continue syncing');
+  String get mizaCloudSyncPartial => _t(
+        'اكتملت المزامنة جزئياً — أعد المزامنة بعد لحظات',
+        'Sync completed partially — sync again in a moment',
+      );
+
+  String get mizaCloudSectionDiagnostics =>
+      _t('تشخيص المزامنة', 'Sync diagnostics');
+  String get mizaCloudDiagDeferred =>
+      _t('مؤجّل من السحب', 'Deferred pull');
+  String get mizaCloudDiagLastPush =>
+      _t('آخر رفع', 'Last push');
+  String get mizaCloudDiagLastPull =>
+      _t('آخر سحب', 'Last pull');
+  String get mizaCloudDiagTopError =>
+      _t('أكثر خطأ', 'Top error');
+  String get mizaCloudDiagNever => _t('—', '—');
+  String mizaCloudDiagLastRun({
+    required int pushed,
+    required int pulled,
+    required int deferred,
+  }) =>
+      _t(
+        'آخر دورة: رفع $pushed · سحب $pulled · مؤجّل $deferred',
+        'Last run: push $pushed · pull $pulled · deferred $deferred',
+      );
+  String mizaCloudDiagTopErrorCount(String label, int count) =>
+      _t('$label ($count)', '$label ($count)');
+  String mizaCloudErrorActionHint(String code) {
+    switch (code) {
+      case 'product_not_found':
+        return _t(
+          'الإجراء: إصلاح الفاشل ثم مزامنة الآن',
+          'Action: Repair failed then Sync now',
+        );
+      case 'insufficient_stock':
+        return _t(
+          'الإجراء: عدّل الكمية محلياً أو استلم مخزوناً ثم أعد الرفع',
+          'Action: Adjust qty locally or receive stock, then upload again',
+        );
+      case 'partner_not_found':
+      case 'customer_not_found':
+      case 'supplier_not_found':
+        return _t(
+          'الإجراء: زامن العملاء/الموردين أولاً ثم أعد الفاتورة',
+          'Action: Sync partners first, then retry the document',
+        );
+      case 'partial_reject':
+      case 'push_rejected':
+        return _t(
+          'الإجراء: افتح التفاصيل الفاشلة وأصلح الصف المرفوض',
+          'Action: Open failed details and fix the rejected row',
+        );
+      default:
+        return '';
+    }
+  }
+
+  String get mizaCloudResolveConflictsButton =>
+      _t('حل التعارضات (سحب ثم مزامنة)', 'Resolve conflicts (pull then sync)');
+  String get mizaCloudResolveConflictsDone => _t(
+        'تم حل التعارضات وإعادة المزامنة',
+        'Conflicts resolved and sync restarted',
+      );
+  String get mizaCloudNetworkFast => _t('الشبكة: سريعة', 'Network: fast');
+  String get mizaCloudNetworkStandard =>
+      _t('الشبكة: عادية', 'Network: standard');
+  String get mizaCloudNetworkConstrained =>
+      _t('الشبكة: محدودة', 'Network: constrained');
+
+  String get mizaCloudSectionLastError =>
+      _t('آخر خطأ مزامنة', 'Last sync error');
+  String get mizaCloudSyncNow => _t('مزامنة الآن', 'Sync now');
+  String get mizaCloudSyncInProgress =>
+      _t('جارٍ المزامنة…', 'Syncing…');
+  String get mizaCloudSyncPhasePush =>
+      _t('جارٍ رفع البيانات', 'Uploading data');
+  String mizaCloudSyncPhasePushDetail(String step) =>
+      _t('جارٍ الرفع: $step', 'Uploading: $step');
+  String get mizaCloudSyncPhasePull =>
+      _t('جارٍ تنزيل البيانات', 'Downloading data');
+  String mizaCloudSyncPhasePullDetail(String step) =>
+      _t('جارٍ التنزيل: $step', 'Downloading: $step');
+  String mizaCloudSyncProgressPending(int done, int total) =>
+      _t('تم رفع $done من $total', 'Uploaded $done of $total');
+  String mizaCloudSyncProgressStep(int current, int total) =>
+      _t('الخطوة $current من $total', 'Step $current of $total');
+  String mizaCloudSyncStepLabel(String key) {
+    switch (key) {
+      case 'catalog_masters':
+        return _t('بيانات الكتالوج', 'Catalog data');
+      case 'partners':
+        return _t('العملاء والموردين', 'Customers & suppliers');
+      case 'transactions':
+        return _t('الفواتير والمعاملات', 'Invoices & transactions');
+      case 'product_images':
+        return _t('صور المنتجات', 'Product images');
+      case 'push_start':
+        return _t('بدء الرفع', 'Starting upload');
+      case 'pull_start':
+        return _t('بدء التنزيل', 'Starting download');
+      default:
+        return mizaCloudOutboxEntityType(key);
+    }
+  }
+  String get mizaCloudSyncPhaseRetry =>
+      _t('إعادة المحاولة…', 'Retrying…');
+  String get mizaCloudSyncSuccess =>
+      _t('تمت المزامنة بنجاح', 'Sync completed successfully');
+  String mizaCloudSuccessAt(String when) =>
+      _t('آخر مزامنة: $when', 'Last sync: $when');
+  String get mizaCloudSyncFailed =>
+      _t('تعذّرت المزامنة', 'Sync failed');
+  String get mizaCloudRetry => _t('إعادة المحاولة', 'Retry');
+  String get mizaCloudErrorGeneric => _t(
+        'حدث خطأ أثناء المزامنة. تحقّق من الاتصال وحاول مجدداً.',
+        'An error occurred during sync. Check your connection and try again.',
+      );
+  String get mizaCloudErrorOffline => _t(
+        'لا يوجد اتصال بالإنترنت.',
+        'No internet connection.',
+      );
+  String get mizaCloudErrorNoContext => _t(
+        'لا يوجد سياق مزامنة (تسجيل دخول أو تسجيل جهاز).',
+        'No sync context (sign-in or device registration required).',
+      );
+  String get mizaCloudErrorSessionExpired => _t(
+        'انتهت الجلسة السحابية. سجّل دخولك إلى ميزا كلاود مرة أخرى.',
+        'Your cloud session expired. Sign in to Miza Cloud again.',
+      );
+  String get mizaCloudSignInAgain =>
+      _t('تسجيل الدخول', 'Sign in');
+  String get mizaCloudRemapTitle => _t(
+        'تأكيد ربط المتجر',
+        'Confirm store link',
+      );
+  String get mizaCloudRemapBody => _t(
+        'سجّلت الدخول بحساب ميزا كلاود مختلف عن الحساب المرتبط سابقاً بهذا الجهاز. '
+        'اضغط «متابعة» فقط إذا كان هذا هو متجرك الصحيح. '
+        'إذا كان حساب متجر آخر، اضغط إلغاء وسجّل بالحساب الصحيح.',
+        'You signed in with a Miza Cloud account different from the one previously linked on this device. '
+        'Tap Continue only if this is the correct store. '
+        'If it is another store’s account, cancel and sign in with the right account.',
+      );
+  String mizaCloudRemapDetail({
+    required String localOrg,
+    required String cloudOrg,
+  }) =>
+      '';
+  String _shortId(String id) {
+    final t = id.trim();
+    if (t.length <= 12) return t;
+    return '${t.substring(0, 8)}…${t.substring(t.length - 4)}';
+  }
+  String get mizaCloudRemapConfirm => _t('متابعة', 'Continue');
+  String get mizaCloudRemapSkipped => _t(
+        'لم يُربَط الحساب. سجّل دخول حساب متجرك الصحيح ثم أعد المزامنة.',
+        'Account was not linked. Sign in with your store account, then sync again.',
+      );
+  String get mizaCloudRemapAutoDone => _t(
+        'تم ربط بيانات المتجر بالسحابة. جارٍ إكمال المزامنة…',
+        'Store data linked to the cloud. Finishing sync…',
+      );
   String get settingsSearchHint =>
       _t('ابحث في الإعدادات…', 'Search settings…');
   String get settingsSearchEmpty =>
@@ -2873,8 +3633,8 @@ class AppLocalizations {
         'In the home footer bar.',
       );
   String get secHomeFooterAfterCalendar => _t(
-        'أزرار يمين التقويم (وقت، عملة، حاسبة، مفكرة)',
-        'Buttons right of calendar (time, currency, calculator, notes)',
+        'أزرار يمين التقويم (وقت، عملة، حاسبة)',
+        'Buttons right of calendar (time, currency, calculator)',
       );
   String get secHomeFooterAfterCalendarSub => _t(
         'أدوات مساعدة بجانب زر التقويم.',
@@ -2885,8 +3645,8 @@ class AppLocalizations {
         'Distributors hub button',
       );
   String get secHomeFooterDistributorsHubSub => _t(
-        'في الشريط السفلي بجانب المفكرة السريعة (سطح المكتب).',
-        'In the desktop home footer next to quick notepad.',
+        'في الشريط السفلي للشاشة الرئيسية (سطح المكتب).',
+        'In the desktop home footer bar.',
       );
   String get secNotifyCalendarAppointments =>
       _t('تنبيهات موعد التقويم', 'Calendar appointment alerts');
@@ -3438,6 +4198,7 @@ class AppLocalizations {
   String get menuAudit => _t('التدقيق', 'Audit');
   String get menuPrinter => _t('الطابعة', 'Printer');
   String get menuBackup => _t('النسخ الاحتياطي', 'Backup');
+  String get menuMizaCloud => mizaCloudScreenTitle;
   String get menuCancelCash =>
       _t('إلغاء سند قبض/صرف', 'Void cash receipt/payment');
   String get menuCancelAmounts =>
@@ -5432,6 +6193,8 @@ class AppLocalizations {
   String get txSaveInvoiceDialogTitle =>
       _t('تأكيد حفظ الفاتورة', 'Confirm save invoice');
   String get txPriceQuoteMode => _t('عرض سعر', 'Price quote');
+  String get txPriceListLabel => _t('قائمة الأسعار', 'Price list');
+  String get txPriceListBaseOption => _t('السعر الأساسي', 'Base price');
   String get txPriceQuoteSave => _t('حفظ عرض السعر', 'Save price quote');
   String get txPriceQuoteSaveConfirmTitle =>
       _t('حفظ عرض السعر؟', 'Save price quote?');
@@ -5524,6 +6287,10 @@ class AppLocalizations {
       _t('إدارة المنتجات', 'Product management');
   String get invToolbarReports => _t('تقارير', 'Reports');
   String get invShowBarcodeToolbar => _t('إظهار الباركود', 'Show barcode');
+  String get invShowImagesToolbar => _t('عرض الصور', 'Show images');
+  String get invBrowseColCategory => _t('الصنف', 'Category');
+  String get invBrowseColUnit => _t('الوحدة', 'Unit');
+  String get invBrowseColCost => _t('التكلفة', 'Cost');
   String get invDamagedDisposeMenu => _t('اتلاف منتجات', 'Write off stock');
   String get inventoryToolbarHintDialogTitle =>
       _t('شرح شاشة إدارة المخزون', 'Inventory management screen');
@@ -5565,7 +6332,7 @@ class AppLocalizations {
   String get invProductName => _t('اسم المنتج', 'Product name');
   String get invSalePrice => _t('سعر البيع', 'Sale price');
   String get invCostPrice => _t('سعر التكلفة', 'Cost price');
-  String get invOpeningQty => _t('الكمية الافتتاحية', 'Opening quantity');
+  String get invOpeningQty => _t('الكمية', 'Quantity');
   String get invProductExpiryDate =>
       _t('تاريخ انتهاء الصلاحية', 'Expiry date');
   String get invProductExpiryNone => _t('لم يُحدد', 'Not set');
@@ -5781,6 +6548,74 @@ class AppLocalizations {
   String get invUnitDeleteConfirm => _t(
         'هل تريد حذف هذه الوحدة؟ سيتم إزالة اختيارها من الأصناف التي تستخدمها.',
         'Delete this unit? It will be cleared from products that use it.',
+      );
+  String get invManageTaxesOption =>
+      _t('إدارة الضرائب', 'Manage taxes');
+  String get invManagePriceListsOption =>
+      _t('قوائم الأسعار', 'Price lists');
+  String get invTaxAddTitle => _t('إضافة ضريبة', 'Add tax');
+  String get invTaxEditTitle => _t('تعديل الضريبة', 'Edit tax');
+  String get invTaxNameLabel => _t('اسم الضريبة', 'Tax name');
+  String get invTaxPercentLabel => _t('النسبة %', 'Rate %');
+  String get invTaxDefaultLabel => _t('افتراضية', 'Default');
+  String get invTaxAddButton => _t('إضافة ضريبة', 'Add tax');
+  String get invTaxSaved => _t('تم حفظ الضريبة.', 'Tax saved.');
+  String get invTaxUpdated => _t('تم تحديث الضريبة.', 'Tax updated.');
+  String get invTaxDeleted => _t('تم حذف الضريبة.', 'Tax deleted.');
+  String get invNoTaxes => _t('لا توجد ضرائب.', 'No taxes.');
+  String get invTaxDeleteConfirm => _t(
+        'حذف هذه الضريبة؟',
+        'Delete this tax?',
+      );
+  String get invPriceListAddTitle =>
+      _t('إضافة قائمة أسعار', 'Add price list');
+  String get invPriceListEditTitle =>
+      _t('تعديل قائمة الأسعار', 'Edit price list');
+  String get invPriceListNameLabel =>
+      _t('اسم القائمة', 'List name');
+  String get invPriceListDefaultLabel =>
+      _t('قائمة افتراضية', 'Default list');
+  String get invPriceListAddButton =>
+      _t('إضافة قائمة', 'Add list');
+  String get invPriceListSaved =>
+      _t('تم حفظ قائمة الأسعار.', 'Price list saved.');
+  String get invPriceListUpdated =>
+      _t('تم تحديث قائمة الأسعار.', 'Price list updated.');
+  String get invPriceListDeleted =>
+      _t('تم حذف قائمة الأسعار.', 'Price list deleted.');
+  String get invNoPriceLists =>
+      _t('لا توجد قوائم أسعار.', 'No price lists.');
+  String get invPriceListDeleteConfirm => _t(
+        'حذف قائمة الأسعار هذه؟',
+        'Delete this price list?',
+      );
+  String get invPriceListItemsHint => _t(
+        'اترك سعر القائمة فارغاً لاستبعاد الصنف من هذه القائمة.',
+        'Leave list price empty to exclude the product from this list.',
+      );
+  String get invPriceListEditItemsTitle =>
+      _t('أسعار قائمة الأسعار', 'Price list items');
+  String invPriceListEditItemsFor(String name) => _t(
+        'أسعار: $name',
+        'Prices: $name',
+      );
+  String get invPriceListEditItemsButton =>
+      _t('تعديل أسعار الأصناف', 'Edit item prices');
+  String get invPriceListBasePriceCol =>
+      _t('السعر الأساسي', 'Base price');
+  String get invPriceListListPriceCol =>
+      _t('سعر القائمة', 'List price');
+  String get invPriceListItemsSaved =>
+      _t('تم حفظ أسعار القائمة.', 'List prices saved.');
+  String get invPriceListCopyBaseHint => _t(
+        'انسخ السعر الأساسي إلى عمود سعر القائمة للأصناف المحددة.',
+        'Copy base price into the list price column for visible items.',
+      );
+  String get invPriceListCopyBaseButton =>
+      _t('نسخ الأساسي', 'Copy base');
+  String invTaxPercentSummary(double percent) => _t(
+        '$percent%',
+        '$percent%',
       );
   String get invProductCategory => _t('التصنيف', 'Category');
   String get invCategoryNone => _t('بدون تصنيف', 'No category');

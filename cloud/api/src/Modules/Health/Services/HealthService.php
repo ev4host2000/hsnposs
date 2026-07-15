@@ -7,6 +7,7 @@ namespace MizaCloud\Modules\Health\Services;
 use DateTimeImmutable;
 use DateTimeZone;
 use MizaCloud\Core\Config\Config;
+use MizaCloud\Core\Http\Request;
 use MizaCloud\Core\Logging\Logger;
 use MizaCloud\Modules\Health\Repositories\HealthRepository;
 
@@ -25,16 +26,25 @@ final class HealthService
         return ['pong' => true];
     }
 
-    public function version(): array
+    /**
+     * RAP-P1-06: public version omits environment/php_version unless detail authorized.
+     *
+     * @return array<string, mixed>
+     */
+    public function version(bool $detailed = false): array
     {
         $app = $this->config->get('app', []);
-
-        return [
+        $payload = [
             'name' => (string) ($app['name'] ?? 'Miza Cloud API'),
             'api_version' => (string) ($app['api_version'] ?? 'v1'),
-            'environment' => (string) ($app['env'] ?? 'production'),
-            'php_version' => PHP_VERSION,
         ];
+
+        if ($detailed) {
+            $payload['environment'] = (string) ($app['env'] ?? 'production');
+            $payload['php_version'] = PHP_VERSION;
+        }
+
+        return $payload;
     }
 
     public function time(): array
@@ -52,18 +62,32 @@ final class HealthService
     }
 
     /**
-     * @return array{connected: bool, latency_ms: float|null, server_time: string|null, error: string|null}
+     * RAP-P1-06: public database status is connected flag only.
+     *
+     * @return array<string, mixed>
      */
-    public function database(): array
+    public function database(bool $detailed = false): array
     {
         $status = $this->repository->databaseStatus();
         $level = $status['connected'] ? 'info' : 'warning';
-        $this->logger->log($level, 'health.database', $status);
+        $this->logger->log($level, 'health.database', [
+            'connected' => $status['connected'],
+            'detailed' => $detailed,
+        ]);
 
-        return $status;
+        if ($detailed) {
+            return $status;
+        }
+
+        return [
+            'connected' => $status['connected'],
+        ];
     }
 
-    public function summary(): array
+    /**
+     * @return array<string, mixed>
+     */
+    public function summary(bool $detailed = false): array
     {
         $database = $this->repository->databaseStatus();
         $loggerOk = $this->probeLogger();
@@ -72,7 +96,15 @@ final class HealthService
         $this->logger->info('health.summary', [
             'status' => $allUp ? 'healthy' : 'degraded',
             'database_connected' => $database['connected'],
+            'detailed' => $detailed,
         ]);
+
+        $databaseCheck = [
+            'status' => $database['connected'] ? 'up' : 'down',
+        ];
+        if ($detailed) {
+            $databaseCheck['latency_ms'] = $database['latency_ms'];
+        }
 
         return [
             'status' => $allUp ? 'healthy' : 'degraded',
@@ -82,13 +114,38 @@ final class HealthService
                 'router' => ['status' => 'up'],
                 'response_builder' => ['status' => 'up'],
                 'logger' => ['status' => $loggerOk ? 'up' : 'down'],
-                'database' => [
-                    'status' => $database['connected'] ? 'up' : 'down',
-                    'latency_ms' => $database['latency_ms'],
-                ],
+                'database' => $databaseCheck,
             ],
-            'version' => $this->version(),
+            'version' => $this->version($detailed),
         ];
+    }
+
+    /** RAP-P1-06: detail views require matching X-Health-Token when token is configured. */
+    public function isDetailAuthorized(Request $request): bool
+    {
+        $app = $this->config->get('app', []);
+        $expected = trim((string) ($app['health_detail_token'] ?? ''));
+        if ($expected === '') {
+            return false;
+        }
+
+        $provided = $this->headerValue($request, 'X-Health-Token');
+        if ($provided === null || $provided === '') {
+            return false;
+        }
+
+        return hash_equals($expected, $provided);
+    }
+
+    private function headerValue(Request $request, string $name): ?string
+    {
+        foreach ($request->headers as $key => $value) {
+            if (strcasecmp((string) $key, $name) === 0) {
+                return is_string($value) ? trim($value) : null;
+            }
+        }
+
+        return null;
     }
 
     private function probeLogger(): bool

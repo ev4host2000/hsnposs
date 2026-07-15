@@ -27,6 +27,20 @@ final class AuthController extends Controller
         return $this->responses->success($data);
     }
 
+    public function forgotPassword(Request $request): Response
+    {
+        $data = $this->service->forgotPassword($this->jsonBody($request));
+
+        return $this->responses->success($data);
+    }
+
+    public function loginPairing(Request $request): Response
+    {
+        $data = $this->service->loginPairing($this->jsonBody($request), $request);
+
+        return $this->responses->success($data);
+    }
+
     public function refresh(Request $request): Response
     {
         $data = $this->service->refresh($this->jsonBody($request));

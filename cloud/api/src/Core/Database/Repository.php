@@ -10,4 +10,9 @@ namespace MizaCloud\Core\Database;
 abstract class Repository
 {
     public function __construct(protected readonly Connection $db) {}
+
+    public function database(): Connection
+    {
+        return $this->db;
+    }
 }

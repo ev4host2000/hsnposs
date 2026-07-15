@@ -69,7 +69,7 @@ class OpeningStockPostLocalService {
     }
 
     if (!idempotentReplay) {
-      await TransactionSyncOutboxWriter.record(
+      await TransactionSyncOutboxWriter.recordBestEffort(
         entityType: OpeningStockSyncConstants.entityType,
         operation: 'post',
         entityId: openingStockId,

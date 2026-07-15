@@ -29,6 +29,7 @@ final class ExceptionHandler
                 $e->getMessage(),
                 $e->statusCode,
                 $e->details,
+                $e->data,
             );
         }
 

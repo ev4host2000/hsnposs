@@ -1,0 +1,320 @@
+openapi: 3.1.0
+info:
+  title: Miza Cloud API
+  version: 1.0.0
+  description: |
+    ملخص مسارات Miza Cloud — التفاصيل الكاملة في ملفات Markdown المجاورة.
+    Base URL: https://api.mizapos.com/v1
+
+servers:
+  - url: https://api.mizapos.com/v1
+    description: Production
+  - url: https://api-staging.mizapos.com/v1
+    description: Staging
+  - url: http://127.0.0.1:8787/v1
+    description: Development
+
+tags:
+  - name: Authentication
+  - name: Devices
+  - name: Companies
+  - name: Branches
+  - name: Users
+  - name: Products
+  - name: Customers
+  - name: Suppliers
+  - name: SalesInvoices
+  - name: PurchaseInvoices
+  - name: SyncPush
+  - name: SyncPull
+  - name: Conflicts
+  - name: Notifications
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    XDeviceId:
+      name: X-Device-ID
+      in: header
+      schema: { type: string, format: uuid }
+    XCompanyId:
+      name: X-Company-ID
+      in: header
+      schema: { type: string, format: uuid }
+    XBranchId:
+      name: X-Branch-ID
+      in: header
+      schema: { type: string, format: uuid }
+    XRequestId:
+      name: X-Request-ID
+      in: header
+      schema: { type: string, format: uuid }
+    Page:
+      name: page
+      in: query
+      schema: { type: integer, default: 1 }
+    PageSize:
+      name: page_size
+      in: query
+      schema: { type: integer, default: 50, maximum: 200 }
+  schemas:
+    ApiSuccess:
+      type: object
+      required: [ok]
+      properties:
+        ok: { type: boolean, example: true }
+        data: { type: object }
+        meta: { type: object }
+    ApiError:
+      type: object
+      required: [ok, error]
+      properties:
+        ok: { type: boolean, example: false }
+        error:
+          type: object
+          properties:
+            code: { type: string }
+            message: { type: string }
+            status_code: { type: integer }
+            details: { type: object }
+
+paths:
+  /auth/login:
+    post:
+      tags: [Authentication]
+      summary: Login
+      security: []
+      responses:
+        '200': { description: OK }
+        '401': { description: invalid_credentials }
+
+  /auth/token/refresh:
+    post:
+      tags: [Authentication]
+      summary: Refresh token
+      security: []
+      responses:
+        '200': { description: OK }
+        '401': { description: refresh_token_expired }
+
+  /auth/logout:
+    post:
+      tags: [Authentication]
+      summary: Logout
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: OK }
+
+  /auth/me:
+    get:
+      tags: [Authentication]
+      summary: Current session
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: OK }
+
+  /auth/devices/register:
+    post:
+      tags: [Devices]
+      summary: Register device
+      security: [{ bearerAuth: [] }]
+      responses:
+        '201': { description: Created }
+        '403': { description: device_limit_reached }
+
+  /devices:
+    get:
+      tags: [Devices]
+      summary: List devices
+      security: [{ bearerAuth: [] }]
+      parameters: [ { $ref: '#/components/parameters/Page' }, { $ref: '#/components/parameters/PageSize' } ]
+      responses:
+        '200': { description: OK }
+
+  /devices/{device_id}:
+    get:
+      tags: [Devices]
+      summary: Get device
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: device_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: OK }
+
+  /devices/{device_id}/revoke:
+    post:
+      tags: [Devices]
+      summary: Revoke device
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: OK }
+
+  /companies/{company_id}:
+    get:
+      tags: [Companies]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: OK }
+    patch:
+      tags: [Companies]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: OK }
+
+  /branches:
+    get:
+      tags: [Branches]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: OK }
+    post:
+      tags: [Branches]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '201': { description: Created }
+
+  /users:
+    get:
+      tags: [Users]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: OK }
+    post:
+      tags: [Users]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '201': { description: Created }
+
+  /products:
+    get:
+      tags: [Products]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: OK }
+    post:
+      tags: [Products]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '201': { description: Created }
+
+  /customers:
+    get:
+      tags: [Customers]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: OK }
+    post:
+      tags: [Customers]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '201': { description: Created }
+
+  /suppliers:
+    get:
+      tags: [Suppliers]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: OK }
+    post:
+      tags: [Suppliers]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '201': { description: Created }
+
+  /sales-invoices:
+    get:
+      tags: [SalesInvoices]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: OK }
+    post:
+      tags: [SalesInvoices]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '201': { description: Created }
+
+  /purchase-invoices:
+    get:
+      tags: [PurchaseInvoices]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: OK }
+    post:
+      tags: [PurchaseInvoices]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '201': { description: Created }
+
+  /sync/push:
+    post:
+      tags: [SyncPush]
+      summary: Push offline events batch
+      security: [{ bearerAuth: [] }]
+      responses:
+        '202': { description: Accepted }
+        '422': { description: partial_reject }
+
+  /sync/push/{batch_id}:
+    get:
+      tags: [SyncPush]
+      summary: Batch status
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: OK }
+
+  /sync/versions:
+    get:
+      tags: [SyncPull]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: OK }
+
+  /sync/pull:
+    get:
+      tags: [SyncPull]
+      summary: Pull changelog delta
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: OK }
+        '410': { description: since_sequence_too_old }
+
+  /sync/conflicts:
+    get:
+      tags: [Conflicts]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: OK }
+
+  /sync/conflicts/{conflict_id}/resolve:
+    post:
+      tags: [Conflicts]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: Resolved }
+
+  /notifications:
+    get:
+      tags: [Notifications]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: OK }
+    post:
+      tags: [Notifications]
+      summary: Admin broadcast
+      security: [{ bearerAuth: [] }]
+      responses:
+        '201': { description: Created }
+
+  /notifications/{notification_id}/read:
+    post:
+      tags: [Notifications]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: OK }

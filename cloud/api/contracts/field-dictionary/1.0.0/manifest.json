@@ -1,0 +1,13 @@
+{
+  "dictionary_version": "1.0.0",
+  "spec": "Miza Cloud Field Dictionary Specification v1.0",
+  "entities": [
+    "product",
+    "customer",
+    "supplier",
+    "product_category",
+    "product_unit",
+    "tax",
+    "price_list"
+  ]
+}

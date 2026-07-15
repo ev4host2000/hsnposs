@@ -156,6 +156,22 @@ final class DeviceService
             'reused' => $httpStatus === 200,
         ]);
 
+        \MizaCloud\Modules\Admin\Services\OpsAuditWriter::recordAction(
+            \MizaCloud\Modules\Admin\Support\OpsAuditActions::DEVICE_ACTIVATION,
+            'success',
+            [
+                'organization_id' => $companyId,
+                'branch_id' => $branchId,
+                'device_id' => $deviceId,
+                'installation_id' => $installationId,
+                'user_id' => $userId !== '' ? $userId : null,
+                'entity' => 'device',
+                'entity_id' => $deviceId,
+                'metadata' => ['reused' => $httpStatus === 200],
+            ],
+            $request,
+        );
+
         return [
             'status' => $httpStatus,
             'data' => array_merge($model->toArray(), $tokenBundle),

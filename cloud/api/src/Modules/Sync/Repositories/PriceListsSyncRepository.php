@@ -5,13 +5,56 @@ declare(strict_types=1);
 namespace MizaCloud\Modules\Sync\Repositories;
 
 use MizaCloud\Modules\Auth\Support\Uuid;
+use MizaCloud\Modules\Sync\Contract\PatchValidator;
+use MizaCloud\Modules\Sync\Support\CatalogPatchOrchestrator;
+use MizaCloud\Modules\Sync\Support\NamedEntityLww;
 
+/**
+ * Price lists: header via NamedEntityLww (Golden Reference).
+ * Nested items are price-list nature — synced outside Field Dictionary.
+ */
 final class PriceListsSyncRepository extends SyncRepositorySupport
 {
+    use NamedEntityLww;
+
     public const ENTITY_TYPE = 'price_list';
+
+    public function __construct(
+        \MizaCloud\Core\Database\Connection $db,
+        private readonly CatalogPatchOrchestrator $patchOrchestrator,
+    ) {
+        parent::__construct($db);
+    }
+
+    protected function namedPatchOrchestrator(): CatalogPatchOrchestrator
+    {
+        return $this->patchOrchestrator;
+    }
+
+    protected function namedEntityType(): string
+    {
+        return self::ENTITY_TYPE;
+    }
+
+    protected function namedEntityPath(): string
+    {
+        return PatchValidator::PATH_PRICE_LIST_CATALOG_PATCH;
+    }
+
+    protected function namedTable(): string
+    {
+        return 'price_lists';
+    }
+
+    /** @return list<string> */
+    protected function namedPatchableColumns(): array
+    {
+        return ['name', 'is_default', 'sort_order'];
+    }
 
     /**
      * @param array<string, mixed> $payload
+     * @param array<string, mixed> $event
      * @return array<string, mixed>
      */
     public function applyPriceListLww(
@@ -22,68 +65,47 @@ final class PriceListsSyncRepository extends SyncRepositorySupport
         array $payload,
         int $clientRowVersion,
         ?string $originDeviceId,
+        array $event = [],
     ): array {
+        $operation = strtolower(trim($operation));
+
+        $result = $this->applyNamedEntityLww(
+            $companyId,
+            $branchId,
+            $entityId,
+            $operation,
+            $payload,
+            $clientRowVersion,
+            $originDeviceId,
+            $event,
+        );
+
         if ($operation === 'delete') {
-            $deleted = $this->softDeleteRow('price_lists', $companyId, $entityId, $clientRowVersion);
+            // Price-list nature: items belong to the list header.
             $this->softDeleteItems($companyId, $entityId);
 
-            return [
-                'id' => $entityId,
-                'company_id' => $companyId,
-                'branch_id' => $branchId,
-                'row_version' => $deleted['row_version'],
-                'deleted' => true,
-            ];
+            return $result;
         }
 
-        $name = trim((string) ($payload['name'] ?? ''));
-        $isDefault = (bool) ($payload['is_default'] ?? false);
-        $sortOrder = (int) ($payload['sort_order'] ?? 0);
+        $hasItemsKey = array_key_exists('items', $payload);
+        if ($operation === 'create' || $hasItemsKey) {
+            $beforeItems = $this->loadActiveItems($companyId, $entityId);
+            $items = $this->syncItems($companyId, $branchId, $entityId, $payload['items'] ?? []);
+            $result['items'] = $items;
 
-        $stmt = $this->db->pdo()->prepare(
-            'INSERT INTO price_lists (
-                id, company_id, branch_id, name, is_default, sort_order,
-                row_version, created_at, updated_at, deleted_at
-             ) VALUES (
-                :id, :company_id, :branch_id, :name, :is_default, :sort_order,
-                :row_version, now(), now(), NULL
-             )
-             ON CONFLICT (id) DO UPDATE SET
-                name = EXCLUDED.name,
-                is_default = EXCLUDED.is_default,
-                sort_order = EXCLUDED.sort_order,
-                row_version = GREATEST(price_lists.row_version, EXCLUDED.row_version),
-                updated_at = now(),
-                deleted_at = NULL
-             RETURNING row_version, name, is_default, sort_order',
-        );
-        $stmt->execute([
-            'id' => $entityId,
-            'company_id' => $companyId,
-            'branch_id' => $branchId,
-            'name' => $name,
-            'is_default' => $isDefault ? 't' : 'f',
-            'sort_order' => $sortOrder,
-            'row_version' => max(1, $clientRowVersion),
-        ]);
-        $row = $stmt->fetch(\PDO::FETCH_ASSOC);
-        if (!is_array($row)) {
-            throw new \RuntimeException('Price list upsert failed');
+            // Header no_op must not hide item mutations (Full payload always carries items).
+            if (($result['no_op'] ?? false) === true
+                && $hasItemsKey
+                && !$this->itemsSemanticallyEqual($beforeItems, $this->normalizeItemsForCompare($payload['items'] ?? []))
+            ) {
+                $result['row_version'] = $this->bumpPriceListRowVersion($companyId, $entityId);
+                $result['no_op'] = false;
+            }
+        } else {
+            $result['items'] = $this->loadActiveItems($companyId, $entityId);
         }
 
-        $items = $this->syncItems($companyId, $branchId, $entityId, $payload['items'] ?? []);
-
-        return [
-            'id' => $entityId,
-            'company_id' => $companyId,
-            'branch_id' => $branchId,
-            'name' => (string) $row['name'],
-            'is_default' => (bool) $row['is_default'],
-            'sort_order' => (int) $row['sort_order'],
-            'items' => $items,
-            'row_version' => (int) $row['row_version'],
-            'deleted' => false,
-        ];
+        return $result;
     }
 
     private function softDeleteItems(string $companyId, string $priceListId): void
@@ -96,6 +118,72 @@ final class PriceListsSyncRepository extends SyncRepositorySupport
             'company_id' => $companyId,
             'price_list_id' => $priceListId,
         ]);
+    }
+
+    private function bumpPriceListRowVersion(string $companyId, string $entityId): int
+    {
+        $stmt = $this->db->pdo()->prepare(
+            'UPDATE price_lists
+             SET row_version = row_version + 1, updated_at = now()
+             WHERE id = :id AND company_id = :company_id
+             RETURNING row_version',
+        );
+        $stmt->execute([
+            'id' => $entityId,
+            'company_id' => $companyId,
+        ]);
+        $version = $stmt->fetchColumn();
+
+        return max(1, (int) $version);
+    }
+
+    /**
+     * @param list<array<string, mixed>> $a
+     * @param list<array<string, mixed>> $b
+     */
+    private function itemsSemanticallyEqual(array $a, array $b): bool
+    {
+        $norm = static function (array $items): array {
+            $out = [];
+            foreach ($items as $item) {
+                $productId = (string) ($item['product_id'] ?? '');
+                if ($productId === '') {
+                    continue;
+                }
+                $out[$productId] = round((float) ($item['sale_price'] ?? 0), 4);
+            }
+            ksort($out);
+
+            return $out;
+        };
+
+        return $norm($a) === $norm($b);
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function normalizeItemsForCompare(mixed $rawItems): array
+    {
+        if (!is_array($rawItems)) {
+            return [];
+        }
+        $out = [];
+        foreach ($rawItems as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+            $productId = (string) ($item['product_id'] ?? '');
+            if ($productId === '') {
+                continue;
+            }
+            $out[] = [
+                'product_id' => $productId,
+                'sale_price' => (float) ($item['sale_price'] ?? 0),
+            ];
+        }
+
+        return $out;
     }
 
     /**

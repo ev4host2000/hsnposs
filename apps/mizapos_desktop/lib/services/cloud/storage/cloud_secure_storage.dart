@@ -48,6 +48,12 @@ abstract class CloudSecureStorage {
   Future<String?> readUserId();
   Future<void> deleteUserId();
 
+  // --- Cloud account login (email / username) ---
+
+  Future<void> writeCloudUsername(String value);
+  Future<String?> readCloudUsername();
+  Future<void> deleteCloudUsername();
+
   /// مسح كل القيم (logout / revoke / factory reset لاحقاً).
   Future<void> clearAll();
 }

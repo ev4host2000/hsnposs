@@ -47,4 +47,28 @@ final class Connection
     {
         $this->pdo = null;
     }
+
+    public function createSavepoint(string $name): void
+    {
+        $this->pdo()->exec('SAVEPOINT ' . $this->assertSavepointName($name));
+    }
+
+    public function rollbackToSavepoint(string $name): void
+    {
+        $this->pdo()->exec('ROLLBACK TO SAVEPOINT ' . $this->assertSavepointName($name));
+    }
+
+    public function releaseSavepoint(string $name): void
+    {
+        $this->pdo()->exec('RELEASE SAVEPOINT ' . $this->assertSavepointName($name));
+    }
+
+    private function assertSavepointName(string $name): string
+    {
+        if (!preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $name)) {
+            throw new \InvalidArgumentException('Invalid savepoint name');
+        }
+
+        return $name;
+    }
 }

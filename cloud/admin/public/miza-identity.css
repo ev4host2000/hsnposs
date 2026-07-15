@@ -1,0 +1,722 @@
+/* =============================================================================
+   Miza Cloud — Visual Identity
+   Unifies the product language across all pages.
+   Visual only. Does not change behavior.
+   ============================================================================= */
+
+:root {
+  /* Brand accent — single premium primary */
+  --miza-accent: #5B5CEB;
+  --miza-accent-hover: #4949D8;
+  --miza-accent-soft: rgba(91, 92, 235, 0.1);
+  --miza-accent-ring: rgba(91, 92, 235, 0.22);
+
+  /* Surfaces */
+  --miza-bg: #F5F7FB;
+  --miza-surface: #FFFFFF;
+  --miza-surface-soft: #F8FAFC;
+  --miza-border: #E6EAF0;
+  --miza-border-soft: rgba(230, 234, 240, 0.9);
+
+  /* Text */
+  --miza-ink: #0F172A;
+  --miza-ink-2: #475569;
+  --miza-ink-3: #94A3B8;
+
+  /* Status palette — one source of truth */
+  --miza-ok: #059669;
+  --miza-ok-bg: rgba(16, 185, 129, 0.1);
+  --miza-ok-border: rgba(16, 185, 129, 0.18);
+
+  --miza-warn: #D97706;
+  --miza-warn-bg: rgba(245, 158, 11, 0.1);
+  --miza-warn-border: rgba(245, 158, 11, 0.2);
+
+  --miza-bad: #DC2626;
+  --miza-bad-bg: rgba(239, 68, 68, 0.1);
+  --miza-bad-border: rgba(239, 68, 68, 0.18);
+
+  --miza-info: #2563EB;
+  --miza-info-bg: rgba(59, 130, 246, 0.1);
+  --miza-info-border: rgba(59, 130, 246, 0.18);
+
+  --miza-neutral: #64748B;
+  --miza-neutral-bg: #F1F5F9;
+  --miza-neutral-border: #E2E8F0;
+
+  /* Shape & depth */
+  --miza-radius: 16px;
+  --miza-radius-sm: 10px;
+  --miza-radius-xs: 8px;
+  --miza-shadow: 0 1px 2px rgba(15, 23, 42, 0.03), 0 8px 24px rgba(15, 23, 42, 0.04);
+  --miza-shadow-hover: 0 4px 8px rgba(15, 23, 42, 0.04), 0 14px 28px rgba(15, 23, 42, 0.06);
+  --miza-pad: 24px;
+
+  /* Map into existing design tokens */
+  --ds-bg: var(--miza-bg);
+  --ds-surface: var(--miza-surface);
+  --ds-surface-muted: var(--miza-surface-soft);
+  --ds-sidebar: var(--miza-surface);
+  --ds-hover: var(--miza-surface-soft);
+  --ds-primary: var(--miza-accent);
+  --ds-primary-hover: var(--miza-accent-hover);
+  --ds-primary-soft: var(--miza-accent-soft);
+  --ds-text: var(--miza-ink);
+  --ds-text-secondary: var(--miza-ink-2);
+  --ds-text-tertiary: var(--miza-ink-3);
+  --ds-border: var(--miza-border);
+  --ds-border-strong: #D5DBE5;
+  --focus-ring: 0 0 0 3px var(--miza-accent-ring);
+  --radius-lg: var(--miza-radius);
+  --shadow-sm: var(--miza-shadow);
+  --shadow-md: var(--miza-shadow-hover);
+}
+
+body {
+  background: var(--miza-bg);
+  color: var(--miza-ink);
+}
+
+/* ─── Miza Cards ─── */
+.card,
+.panel-card,
+.tool-card,
+.kpi-card,
+.login-card,
+.infra-card,
+.modal-card,
+.dash-page-header,
+.stores-page-header,
+.stores-toolbar,
+.stores-table-card,
+.stores-stat-card,
+.cc-header,
+.cc-summary-card,
+.cc-panel,
+.dash-action-card,
+.dash-health-card,
+.dash-summary-item {
+  background: var(--miza-surface);
+  border: 1px solid var(--miza-border-soft);
+  border-radius: var(--miza-radius);
+  box-shadow: var(--miza-shadow);
+}
+
+.panel-card,
+.cc-panel.panel-card,
+.dash-panel.panel-card {
+  padding: var(--miza-pad);
+}
+
+.card,
+.panel-card,
+.kpi-card,
+.stores-stat-card,
+.cc-summary-card,
+.dash-action-card,
+.cc-device-card {
+  transition:
+    transform var(--duration) var(--ease),
+    box-shadow var(--duration) var(--ease),
+    border-color var(--duration) var(--ease);
+}
+
+.panel-card:hover,
+.kpi-card:hover,
+.stores-stat-card:hover,
+.cc-summary-card:hover,
+.dash-action-card:hover,
+.cc-device-card:hover {
+  box-shadow: var(--miza-shadow-hover);
+  border-color: rgba(91, 92, 235, 0.16);
+}
+
+.panel-head {
+  margin-bottom: var(--space-4);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid #F1F5F9;
+}
+
+.panel-head h2,
+.compact-panel h2,
+#company-sync-health h3,
+.tool-card h3,
+.modal-head h3 {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--miza-ink);
+}
+
+.panel-head .muted {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--miza-ink-3);
+}
+
+/* ─── Miza Headers (one template) ─── */
+.page-header,
+.dash-page-header,
+.stores-page-header,
+.cc-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: var(--space-5);
+  margin-bottom: var(--space-5);
+  padding: var(--miza-pad);
+  background: var(--miza-surface);
+  border: 1px solid var(--miza-border-soft);
+  border-radius: var(--miza-radius);
+  box-shadow: var(--miza-shadow);
+}
+
+.page-header h1,
+.dash-page-header h1,
+.stores-page-header h1,
+.cc-store-title,
+.login-card h1 {
+  margin: 0 0 8px;
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1.15;
+  color: var(--miza-ink);
+}
+
+.page-header .muted,
+.dash-page-desc,
+.stores-page-desc,
+.cc-owner-line {
+  margin: 0;
+  font-size: 14px;
+  color: var(--miza-ink-2);
+  line-height: 1.5;
+}
+
+.eyebrow {
+  color: var(--miza-accent);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.page-header .header-actions,
+.dash-page-header-actions,
+.stores-page-header-actions,
+.cc-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+/* ─── Miza Buttons ─── */
+.btn {
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 16px;
+  border-radius: var(--miza-radius-xs);
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.btn-sm,
+.btn.btn-sm {
+  min-height: 32px;
+  padding: 0 12px;
+  font-size: 13px;
+  border-radius: var(--miza-radius-xs);
+}
+
+.btn-lg,
+.btn.btn-lg {
+  min-height: 48px;
+  padding: 0 20px;
+  font-size: 15px;
+  border-radius: var(--miza-radius-sm);
+}
+
+.btn-primary {
+  background: var(--miza-accent);
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 1px 2px rgba(91, 92, 235, 0.2), 0 6px 14px rgba(91, 92, 235, 0.18);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--miza-accent-hover);
+  box-shadow: 0 2px 4px rgba(91, 92, 235, 0.22), 0 10px 18px rgba(91, 92, 235, 0.2);
+}
+
+.btn-secondary {
+  background: var(--miza-surface-soft);
+  color: var(--miza-ink);
+  border-color: var(--miza-border);
+}
+
+.btn-outline {
+  background: var(--miza-surface);
+  color: var(--miza-ink);
+  border-color: var(--miza-border);
+}
+
+.btn-ghost {
+  background: var(--miza-surface);
+  color: var(--miza-ink);
+  border-color: var(--miza-border);
+}
+
+.btn-ghost:hover:not(:disabled),
+.btn-secondary:hover:not(:disabled),
+.btn-outline:hover:not(:disabled) {
+  background: #EEF2F7;
+  border-color: #D5DBE5;
+}
+
+.btn-danger {
+  background: var(--miza-bad-bg);
+  color: #B91C1C;
+  border-color: var(--miza-bad-border);
+}
+
+.btn-success {
+  background: var(--miza-ok-bg);
+  color: #047857;
+  border-color: var(--miza-ok-border);
+}
+
+/* ─── Miza Forms ─── */
+.field span {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--miza-ink-2);
+}
+
+input,
+select,
+textarea {
+  min-height: 40px;
+  border-radius: var(--miza-radius-xs);
+  border-color: var(--miza-border);
+  background: var(--miza-surface);
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--miza-accent);
+  box-shadow: var(--focus-ring);
+}
+
+/* ─── Miza Status system ─── */
+.badge,
+.status-pill,
+.count-badge,
+.stores-plan-pill,
+.cc-plan-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+/* Healthy / Active / Success */
+.badge.active,
+.badge.healthy,
+.status-pill.healthy,
+.tone-success,
+.stores-stat-card.tone-success,
+.cc-summary-card.tone-success,
+.dash-health-card.tone-success {
+  --status-fg: var(--miza-ok);
+  --status-bg: var(--miza-ok-bg);
+  --status-bd: var(--miza-ok-border);
+}
+
+/* Warning / Suspended / Trial / Stale / Degraded */
+.badge.suspended,
+.badge.stale,
+.badge.pending,
+.badge.trial,
+.badge.warning,
+.status-pill.degraded,
+.tone-warning,
+.stores-stat-card.tone-warning,
+.cc-summary-card.tone-warning,
+.dash-health-card.tone-warning {
+  --status-fg: var(--miza-warn);
+  --status-bg: var(--miza-warn-bg);
+  --status-bd: var(--miza-warn-border);
+}
+
+/* Danger / Closed / Expired / Critical */
+.badge.closed,
+.badge.expired,
+.badge.revoked,
+.badge.danger,
+.status-pill.critical,
+.tone-danger,
+.stores-stat-card.tone-danger,
+.cc-summary-card.tone-danger,
+.dash-health-card.tone-danger {
+  --status-fg: var(--miza-bad);
+  --status-bg: var(--miza-bad-bg);
+  --status-bd: var(--miza-bad-border);
+}
+
+/* Offline / Inactive / Neutral */
+.badge.offline,
+.badge.inactive,
+.badge.neutral,
+.tone-neutral,
+.stores-stat-card.tone-neutral,
+.cc-summary-card.tone-neutral {
+  --status-fg: var(--miza-neutral);
+  --status-bg: var(--miza-neutral-bg);
+  --status-bd: var(--miza-neutral-border);
+}
+
+/* Info */
+.badge.info,
+.tone-info,
+.stores-stat-card.tone-info,
+.cc-summary-card.tone-info,
+.dash-health-card.tone-info {
+  --status-fg: var(--miza-info);
+  --status-bg: var(--miza-info-bg);
+  --status-bd: var(--miza-info-border);
+}
+
+.badge.active,
+.badge.healthy,
+.badge.suspended,
+.badge.stale,
+.badge.pending,
+.badge.trial,
+.badge.warning,
+.badge.closed,
+.badge.expired,
+.badge.revoked,
+.badge.danger,
+.badge.offline,
+.badge.inactive,
+.badge.neutral,
+.badge.info,
+.status-pill.healthy,
+.status-pill.degraded,
+.status-pill.critical {
+  background: var(--status-bg, var(--miza-neutral-bg));
+  color: var(--status-fg, var(--miza-neutral));
+  border-color: var(--status-bd, var(--miza-neutral-border));
+}
+
+.status-pill::before {
+  width: 7px;
+  height: 7px;
+  background: currentColor;
+  box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 18%, transparent);
+}
+
+.count-badge,
+.cc-plan-badge,
+.stores-plan-pill {
+  background: var(--miza-accent-soft);
+  color: var(--miza-accent);
+  border-color: rgba(91, 92, 235, 0.18);
+}
+
+.stores-plan-pill.trial,
+.cc-plan-badge.trial {
+  background: var(--miza-warn-bg);
+  color: var(--miza-warn);
+  border-color: var(--miza-warn-border);
+}
+
+/* ─── Miza Icons ─── */
+.nav-icon,
+.kpi-icon,
+.empty-icon,
+.stores-stat-icon,
+.cc-summary-icon,
+.dash-action-icon,
+.dash-summary-icon,
+.dash-health-icon,
+.cc-timeline-dot,
+.dash-timeline-dot {
+  width: 36px;
+  height: 36px;
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: var(--miza-accent-soft);
+  color: var(--miza-accent);
+  border: none;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1;
+  box-shadow: none;
+}
+
+.nav-icon {
+  width: 32px;
+  height: 32px;
+  background: var(--miza-surface-soft);
+  color: var(--miza-ink-2);
+  border: 1px solid var(--miza-border);
+}
+
+.nav-btn.active .nav-icon {
+  background: var(--miza-accent-soft);
+  color: var(--miza-accent);
+  border-color: rgba(91, 92, 235, 0.2);
+}
+
+.kpi-card.ok .kpi-icon,
+.tone-success .stores-stat-icon,
+.tone-success .cc-summary-icon,
+.tone-success .dash-health-icon {
+  background: var(--miza-ok-bg);
+  color: var(--miza-ok);
+}
+
+.kpi-card.warn .kpi-icon,
+.tone-warning .stores-stat-icon,
+.tone-warning .cc-summary-icon,
+.tone-warning .dash-health-icon {
+  background: var(--miza-warn-bg);
+  color: var(--miza-warn);
+}
+
+.kpi-card.danger .kpi-icon,
+.tone-danger .stores-stat-icon,
+.tone-danger .cc-summary-icon,
+.tone-danger .dash-health-icon {
+  background: var(--miza-bad-bg);
+  color: var(--miza-bad);
+}
+
+.tone-info .stores-stat-icon,
+.tone-info .cc-summary-icon,
+.tone-info .dash-health-icon,
+.dash-action-icon-info {
+  background: var(--miza-info-bg);
+  color: var(--miza-info);
+}
+
+/* ─── Miza Tables ─── */
+.table-wrap,
+.modern-table,
+.stores-table,
+.dash-table {
+  background: var(--miza-surface);
+  border: 1px solid var(--miza-border-soft);
+  border-radius: var(--miza-radius);
+  box-shadow: var(--miza-shadow);
+  overflow: auto;
+}
+
+.stores-table-card .stores-table,
+#dashboard-view .dash-table {
+  box-shadow: none;
+}
+
+.modern-table th,
+.stores-table th,
+.dash-table th {
+  background: #F8FAFC !important;
+  color: var(--miza-ink-3) !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.05em !important;
+  text-transform: uppercase !important;
+  padding: 14px 16px !important;
+  border-bottom: 1px solid #EEF2F7 !important;
+}
+
+.modern-table td,
+.stores-table td,
+.dash-table td {
+  padding: 16px !important;
+  font-size: 14px;
+  color: #334155;
+  border-bottom-color: #F1F5F9 !important;
+}
+
+.modern-table tbody tr:hover td,
+.stores-table tbody tr:hover td,
+.dash-table tbody tr:hover td {
+  background: #F8FAFC !important;
+}
+
+.modern-table tbody tr:not(.empty-row):hover td:first-child,
+.stores-table tbody tr:not(.empty-row):hover td:first-child,
+.dash-table tbody tr:not(.empty-row):hover td:first-child {
+  box-shadow: inset -3px 0 0 var(--miza-accent);
+}
+
+/* ─── Miza Sidebar ─── */
+.sidebar {
+  background: var(--miza-surface);
+  border-left: 1px solid var(--miza-border-soft);
+  box-shadow: 1px 0 0 rgba(15, 23, 42, 0.02);
+}
+
+.nav-btn {
+  border-radius: var(--miza-radius-xs);
+  font-weight: 500;
+  color: var(--miza-ink-2);
+}
+
+.nav-btn:hover {
+  background: var(--miza-surface-soft);
+  color: var(--miza-ink);
+}
+
+.nav-btn.active {
+  background: var(--miza-accent-soft);
+  border-color: rgba(91, 92, 235, 0.18);
+  color: var(--miza-accent);
+  box-shadow: none;
+}
+
+.brand-mark {
+  background: var(--miza-accent);
+  box-shadow: 0 8px 20px rgba(91, 92, 235, 0.25);
+}
+
+/* ─── Miza Empty States ─── */
+.empty-state,
+.dash-empty,
+.cc-empty .dash-empty {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 40px 24px;
+  text-align: center;
+}
+
+.empty-icon {
+  width: 48px !important;
+  height: 48px !important;
+  background: var(--miza-surface) !important;
+  color: var(--miza-accent) !important;
+  box-shadow: var(--miza-shadow) !important;
+  border: 1px solid var(--miza-border-soft) !important;
+}
+
+.empty-state-text,
+.dash-empty .empty-state-text {
+  max-width: 240px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--miza-ink-2);
+  line-height: 1.45;
+}
+
+.empty-row td {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* ─── Miza Dialogs / Toast ─── */
+.modal-backdrop {
+  background: rgba(15, 23, 42, 0.42);
+  backdrop-filter: blur(6px);
+}
+
+.modal-card {
+  border-radius: var(--miza-radius);
+  border: 1px solid var(--miza-border-soft);
+  box-shadow: var(--miza-shadow-hover);
+  overflow: hidden;
+}
+
+.modal-head {
+  background: var(--miza-surface-soft);
+  border-bottom: 1px solid var(--miza-border-soft);
+}
+
+.toast {
+  background: var(--miza-surface);
+  border: 1px solid var(--miza-border-soft);
+  color: var(--miza-ink);
+  box-shadow: var(--miza-shadow-hover);
+}
+
+/* ─── Soften page-specific overrides toward identity ─── */
+.stores-stat-card,
+.cc-summary-card,
+.dash-health-card,
+.dash-summary-item,
+.cc-device-card,
+.cc-info-item,
+.cc-warning-item {
+  border-radius: 14px;
+}
+
+.stores-filter-chip.active {
+  background: var(--miza-accent-soft);
+  border-color: rgba(91, 92, 235, 0.22);
+  color: var(--miza-accent);
+}
+
+.dash-action-submit,
+.cc-quick-btn {
+  border-radius: var(--miza-radius-sm);
+}
+
+#dashboard-view .kpi-card,
+#company-detail-view .kpi-card {
+  border-radius: var(--miza-radius);
+}
+
+.login-shell {
+  background:
+    radial-gradient(ellipse 55% 40% at 50% 0%, rgba(91, 92, 235, 0.1), transparent 60%),
+    var(--miza-bg);
+}
+
+.login-card {
+  padding: 32px 28px;
+}
+
+.section-title {
+  margin: var(--space-6) 0 var(--space-3);
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--miza-ink);
+}
+
+@media (max-width: 900px) {
+  .page-header,
+  .dash-page-header,
+  .stores-page-header,
+  .cc-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .page-header h1,
+  .dash-page-header h1,
+  .stores-page-header h1,
+  .cc-store-title {
+    font-size: 26px;
+  }
+}

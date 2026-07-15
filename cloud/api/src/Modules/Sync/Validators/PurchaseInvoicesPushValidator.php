@@ -21,7 +21,7 @@ final class PurchaseInvoicesPushValidator extends TransactionPushValidator
     /** @return list<string> */
     protected function supportedPushOperations(): array
     {
-        return ['create', 'update', 'cancel', 'post'];
+        return ['create', 'update', 'cancel', 'post', 'void'];
     }
 
     /** @param array<string, mixed> $payload @return list<string> */
@@ -31,8 +31,63 @@ final class PurchaseInvoicesPushValidator extends TransactionPushValidator
         if ($operation === 'post') {
             return $this->validatePostPayload($payload, $prefix);
         }
+        if ($operation === 'void') {
+            return $this->validateVoidPayload($payload, $prefix);
+        }
 
         return parent::validateTransactionPayload($payload, $prefix);
+    }
+
+    /** @param array<string, mixed> $payload @return list<string> */
+    private function validateVoidPayload(array $payload, string $prefix): array
+    {
+        $errors = [];
+        $aggregate = $payload['aggregate'] ?? null;
+        if (!is_array($aggregate)) {
+            $errors[] = "{$prefix}.payload_json.aggregate:aggregate envelope is required";
+
+            return $errors;
+        }
+
+        $header = $aggregate['header'] ?? null;
+        if (!is_array($header)) {
+            $errors[] = "{$prefix}.payload_json.aggregate.header:header is required";
+
+            return $errors;
+        }
+
+        if (($header['document_type'] ?? '') !== $this->entityType()) {
+            $errors[] = "{$prefix}.payload_json.aggregate.header.document_type:document_type mismatch";
+        }
+
+        $status = (string) ($header['status'] ?? '');
+        if (!in_array($status, ['void', 'voided'], true)) {
+            $errors[] = "{$prefix}.payload_json.aggregate.header.status:Void requires void status";
+        }
+
+        if (!is_string($header['id'] ?? null) || !Uuid::isValid((string) $header['id'])) {
+            $errors[] = "{$prefix}.payload_json.aggregate.header.id:Valid header id is required";
+        }
+
+        $supplierId = (string) ($header['supplier_id'] ?? '');
+        if ($supplierId === '' || !Uuid::isValid($supplierId)) {
+            $errors[] = "{$prefix}.payload_json.aggregate.header.supplier_id:Valid supplier_id is required for void";
+        }
+
+        $lines = $aggregate['lines'] ?? null;
+        if (!is_array($lines) || $lines === []) {
+            $errors[] = "{$prefix}.payload_json.aggregate.lines:At least one line is required for void";
+        }
+
+        $metadata = is_array($aggregate['metadata'] ?? null) ? $aggregate['metadata'] : [];
+        $inventory = is_array($aggregate['inventory'] ?? null)
+            ? $aggregate['inventory']
+            : ($metadata['inventory'] ?? []);
+        if (!is_array($inventory) || $inventory === []) {
+            $errors[] = "{$prefix}.payload_json.aggregate.inventory:inventory section is required for void";
+        }
+
+        return array_merge($errors, $this->validateAggregateExtras($aggregate, $prefix));
     }
 
     /** @param array<string, mixed> $payload @return list<string> */

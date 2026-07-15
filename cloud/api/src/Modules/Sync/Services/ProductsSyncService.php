@@ -9,6 +9,7 @@ use MizaCloud\Core\Http\Request;
 use MizaCloud\Core\Logging\Logger;
 use MizaCloud\Modules\Devices\Support\BearerToken;
 use MizaCloud\Modules\Sync\Repositories\ProductsSyncRepository;
+use MizaCloud\Modules\Sync\Support\SyncPushBatchExecutor;
 use MizaCloud\Modules\Sync\Validators\ProductsPullValidator;
 use MizaCloud\Modules\Sync\Validators\ProductsPushValidator;
 use Throwable;
@@ -56,65 +57,78 @@ final class ProductsSyncService
 
         $this->repository->beginTransaction();
         try {
-            foreach ($events as $event) {
-                $idempotencyKey = (string) $event['idempotency_key'];
-                if ($this->repository->findQueueByIdempotency($deviceId, $idempotencyKey) !== null) {
-                    $duplicates++;
-                    continue;
-                }
-
-                $entityId = (string) $event['entity_id'];
-                $operation = (string) $event['operation'];
-                $clientRowVersion = (int) ($event['client_row_version'] ?? 1);
-                $payloadJson = is_array($event['payload_json'] ?? null)
-                    ? $event['payload_json']
-                    : [];
-                $occurredAt = isset($event['occurred_at']) ? (string) $event['occurred_at'] : null;
-
-                $applied = $this->repository->applyProductLww(
-                    $companyId,
-                    $branchId,
-                    $entityId,
-                    $operation,
-                    $payloadJson,
-                    $clientRowVersion,
-                    $deviceId,
-                );
-
-                $sequence = $this->repository->nextSyncSequence($companyId);
-                $changelogPayload = $operation === 'delete'
-                    ? ['id' => $entityId, 'deleted' => true, 'row_version' => $applied['row_version']]
-                    : $applied;
-
-                $this->repository->insertChangelog(
-                    $companyId,
-                    $branchId,
-                    $sequence,
-                    $entityId,
-                    $operation,
-                    $changelogPayload,
-                    (int) $applied['row_version'],
-                    $deviceId,
-                    $occurredAt,
-                );
-
-                $this->repository->insertSyncQueue(
+            $outcome = SyncPushBatchExecutor::run(
+                $this->repository->database(),
+                $events,
+                function (array $event) use (
                     $companyId,
                     $branchId,
                     $deviceId,
                     $batchId,
-                    $entityId,
-                    $operation,
-                    $changelogPayload,
-                    $clientRowVersion,
-                    $idempotencyKey,
-                );
+                ): array {
+                    $idempotencyKey = (string) $event['idempotency_key'];
+                    if ($this->repository->findQueueByIdempotency($deviceId, $idempotencyKey) !== null) {
+                        return ['kind' => 'duplicate'];
+                    }
 
-                $accepted++;
-                $sequences[] = $sequence;
-            }
+                    $entityId = (string) $event['entity_id'];
+                    $operation = (string) $event['operation'];
+                    $clientRowVersion = (int) ($event['client_row_version'] ?? 1);
+                    $payloadJson = is_array($event['payload_json'] ?? null)
+                        ? $event['payload_json']
+                        : [];
+                    $occurredAt = isset($event['occurred_at']) ? (string) $event['occurred_at'] : null;
 
-            if ($accepted > 0) {
+                    $applied = $this->repository->applyProductLww(
+                        $companyId,
+                        $branchId,
+                        $entityId,
+                        $operation,
+                        $payloadJson,
+                        $clientRowVersion,
+                        $deviceId,
+                        $event,
+                    );
+
+                    // Safe Equality no-op: accept without mutating changelog / queue / sequence.
+                    if (($applied['no_op'] ?? false) === true) {
+                        return ['kind' => 'accepted'];
+                    }
+
+                    $sequence = $this->repository->nextSyncSequence($companyId);
+                    $changelogPayload = $operation === 'delete'
+                        ? ['id' => $entityId, 'deleted' => true, 'row_version' => $applied['row_version']]
+                        : $applied;
+
+                    $this->repository->insertChangelog(
+                        $companyId,
+                        $branchId,
+                        $sequence,
+                        $entityId,
+                        $operation,
+                        $changelogPayload,
+                        (int) $applied['row_version'],
+                        $deviceId,
+                        $occurredAt,
+                    );
+
+                    $this->repository->insertSyncQueue(
+                        $companyId,
+                        $branchId,
+                        $deviceId,
+                        $batchId,
+                        $entityId,
+                        $operation,
+                        $changelogPayload,
+                        $clientRowVersion,
+                        $idempotencyKey,
+                    );
+
+                    return ['kind' => 'accepted', 'sequence' => $sequence];
+                },
+            );
+
+            if ($outcome['accepted'] > 0) {
                 $this->repository->bumpCloudVersion($companyId, $branchId, self::ENTITY_SCOPE);
             }
 
@@ -124,28 +138,15 @@ final class ProductsSyncService
             throw $e;
         }
 
-        $statusLabel = $accepted === 0 && $duplicates > 0 ? 'duplicate' : 'accepted';
-        $httpStatus = $statusLabel === 'duplicate' ? 200 : 202;
-
         $this->logger->info('sync.push.products', [
             'batch_id' => $batchId,
             'device_id' => $deviceId,
-            'accepted' => $accepted,
-            'duplicates' => $duplicates,
+            'accepted' => $outcome['accepted'],
+            'duplicates' => $outcome['duplicates'],
+            'rejected' => count($outcome['rejected_events']),
         ]);
 
-        return [
-            'status' => $httpStatus,
-            'data' => [
-                'batch_id' => $batchId,
-                'status' => $statusLabel,
-                'accepted' => $accepted,
-                'duplicates' => $duplicates,
-                'rejected' => 0,
-                'queued_at' => gmdate('Y-m-d\TH:i:s.v\Z'),
-                'changelog_sequences' => $sequences,
-            ],
-        ];
+        return SyncPushBatchExecutor::finalizeOrThrowPartial($batchId, $outcome);
     }
 
     /** @return array{data: array<string, mixed>, meta: array<string, mixed>} */

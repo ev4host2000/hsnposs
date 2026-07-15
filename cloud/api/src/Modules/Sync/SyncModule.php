@@ -11,6 +11,11 @@ use MizaCloud\Core\Logging\Logger;
 use MizaCloud\Core\Modules\ModuleInterface;
 use MizaCloud\Core\Router\Router;
 use MizaCloud\Modules\Devices\Support\BearerToken;
+use MizaCloud\Modules\Sync\Contract\ChangeDetectionEngine;
+use MizaCloud\Modules\Sync\Contract\FieldDictionaryLoader;
+use MizaCloud\Modules\Sync\Contract\FieldMetadataProvider;
+use MizaCloud\Modules\Sync\Contract\PatchBuilder;
+use MizaCloud\Modules\Sync\Contract\PatchValidator;
 use MizaCloud\Modules\Sync\Controllers\CustomersSyncController;
 use MizaCloud\Modules\Sync\Controllers\PriceListsSyncController;
 use MizaCloud\Modules\Sync\Controllers\ProductCategoriesSyncController;
@@ -25,8 +30,12 @@ use MizaCloud\Modules\Sync\Controllers\CustomerPaymentsSyncController;
 use MizaCloud\Modules\Sync\Controllers\SupplierPaymentsSyncController;
 use MizaCloud\Modules\Sync\Controllers\InventoryAdjustmentsSyncController;
 use MizaCloud\Modules\Sync\Controllers\OpeningStocksSyncController;
+use MizaCloud\Modules\Sync\Controllers\CashTransactionsSyncController;
+use MizaCloud\Modules\Sync\Controllers\ExpensesSyncController;
 use MizaCloud\Modules\Sync\Controllers\SyncController;
 use MizaCloud\Modules\Sync\Controllers\TaxesSyncController;
+use MizaCloud\Modules\Sync\Repositories\CashTransactionsSyncRepository;
+use MizaCloud\Modules\Sync\Repositories\ExpensesSyncRepository;
 use MizaCloud\Modules\Sync\Repositories\CustomersSyncRepository;
 use MizaCloud\Modules\Sync\Repositories\PriceListsSyncRepository;
 use MizaCloud\Modules\Sync\Repositories\ProductCategoriesSyncRepository;
@@ -43,6 +52,12 @@ use MizaCloud\Modules\Sync\Repositories\InventoryAdjustmentsSyncRepository;
 use MizaCloud\Modules\Sync\Repositories\OpeningStocksSyncRepository;
 use MizaCloud\Modules\Sync\Repositories\SyncRepository;
 use MizaCloud\Modules\Sync\Repositories\TaxesSyncRepository;
+use MizaCloud\Modules\Sync\Support\CatalogFullToPatchAdapter;
+use MizaCloud\Modules\Sync\Support\CatalogPatchOrchestrator;
+use MizaCloud\Modules\Sync\Support\ProductFullToPatchAdapter;
+use MizaCloud\Modules\Sync\Support\ProductPatchOrchestrator;
+use MizaCloud\Modules\Sync\Services\CashTransactionsSyncService;
+use MizaCloud\Modules\Sync\Services\ExpensesSyncService;
 use MizaCloud\Modules\Sync\Services\CustomersSyncService;
 use MizaCloud\Modules\Sync\Services\PriceListsSyncService;
 use MizaCloud\Modules\Sync\Services\ProductCategoriesSyncService;
@@ -71,32 +86,82 @@ final class SyncModule implements ModuleInterface
     {
         $container->singleton(SyncRepository::class, static fn ($c) => new SyncRepository($c->get(Connection::class)));
 
+        $dictionaryRoot = dirname(__DIR__, 3) . '/contracts/field-dictionary';
+        $container->singleton(FieldMetadataProvider::class, static function () use ($dictionaryRoot) {
+            $loader = new FieldDictionaryLoader($dictionaryRoot);
+            $dictionary = $loader->load('1.0.0');
+
+            return new FieldMetadataProvider($dictionary);
+        });
+        $container->singleton(ChangeDetectionEngine::class, static fn ($c) => new ChangeDetectionEngine(
+            $c->get(FieldMetadataProvider::class),
+        ));
+        $container->singleton(PatchBuilder::class, static fn ($c) => new PatchBuilder(
+            $c->get(ChangeDetectionEngine::class),
+            $c->get(FieldMetadataProvider::class),
+        ));
+        $container->singleton(PatchValidator::class, static fn ($c) => new PatchValidator(
+            $c->get(FieldMetadataProvider::class),
+            $c->get(ChangeDetectionEngine::class),
+        ));
+        $container->singleton(ProductFullToPatchAdapter::class, static fn ($c) => new ProductFullToPatchAdapter(
+            $c->get(ChangeDetectionEngine::class),
+            $c->get(PatchBuilder::class),
+            $c->get(FieldMetadataProvider::class),
+        ));
+        $container->singleton(CatalogFullToPatchAdapter::class, static fn ($c) => new CatalogFullToPatchAdapter(
+            $c->get(ChangeDetectionEngine::class),
+            $c->get(PatchBuilder::class),
+            $c->get(FieldMetadataProvider::class),
+        ));
+        $container->singleton(CatalogPatchOrchestrator::class, static fn ($c) => new CatalogPatchOrchestrator(
+            $c->get(FieldMetadataProvider::class),
+            $c->get(ChangeDetectionEngine::class),
+            $c->get(PatchBuilder::class),
+            $c->get(PatchValidator::class),
+            $c->get(CatalogFullToPatchAdapter::class),
+        ));
+        $container->singleton(ProductPatchOrchestrator::class, static fn ($c) => new ProductPatchOrchestrator(
+            $c->get(FieldMetadataProvider::class),
+            $c->get(ChangeDetectionEngine::class),
+            $c->get(PatchBuilder::class),
+            $c->get(PatchValidator::class),
+            $c->get(ProductFullToPatchAdapter::class),
+        ));
+
         $container->singleton(ProductsSyncRepository::class, static fn ($c) => new ProductsSyncRepository(
             $c->get(Connection::class),
+            $c->get(ProductPatchOrchestrator::class),
         ));
 
         $container->singleton(ProductCategoriesSyncRepository::class, static fn ($c) => new ProductCategoriesSyncRepository(
             $c->get(Connection::class),
+            $c->get(CatalogPatchOrchestrator::class),
         ));
 
         $container->singleton(ProductUnitsSyncRepository::class, static fn ($c) => new ProductUnitsSyncRepository(
             $c->get(Connection::class),
+            $c->get(CatalogPatchOrchestrator::class),
         ));
 
         $container->singleton(TaxesSyncRepository::class, static fn ($c) => new TaxesSyncRepository(
             $c->get(Connection::class),
+            $c->get(CatalogPatchOrchestrator::class),
         ));
 
         $container->singleton(PriceListsSyncRepository::class, static fn ($c) => new PriceListsSyncRepository(
             $c->get(Connection::class),
+            $c->get(CatalogPatchOrchestrator::class),
         ));
 
         $container->singleton(CustomersSyncRepository::class, static fn ($c) => new CustomersSyncRepository(
             $c->get(Connection::class),
+            $c->get(CatalogPatchOrchestrator::class),
         ));
 
         $container->singleton(SuppliersSyncRepository::class, static fn ($c) => new SuppliersSyncRepository(
             $c->get(Connection::class),
+            $c->get(CatalogPatchOrchestrator::class),
         ));
 
         $container->singleton(PurchaseInvoicesSyncRepository::class, static fn ($c) => new PurchaseInvoicesSyncRepository(
@@ -128,6 +193,14 @@ final class SyncModule implements ModuleInterface
         ));
 
         $container->singleton(OpeningStocksSyncRepository::class, static fn ($c) => new OpeningStocksSyncRepository(
+            $c->get(Connection::class),
+        ));
+
+        $container->singleton(CashTransactionsSyncRepository::class, static fn ($c) => new CashTransactionsSyncRepository(
+            $c->get(Connection::class),
+        ));
+
+        $container->singleton(ExpensesSyncRepository::class, static fn ($c) => new ExpensesSyncRepository(
             $c->get(Connection::class),
         ));
 
@@ -224,6 +297,18 @@ final class SyncModule implements ModuleInterface
             logger: $c->get(Logger::class),
         ));
 
+        $container->singleton(CashTransactionsSyncService::class, static fn ($c) => new CashTransactionsSyncService(
+            repository: $c->get(CashTransactionsSyncRepository::class),
+            bearer: $c->get(BearerToken::class),
+            logger: $c->get(Logger::class),
+        ));
+
+        $container->singleton(ExpensesSyncService::class, static fn ($c) => new ExpensesSyncService(
+            repository: $c->get(ExpensesSyncRepository::class),
+            bearer: $c->get(BearerToken::class),
+            logger: $c->get(Logger::class),
+        ));
+
         $container->singleton(SyncService::class, static fn ($c) => new SyncService($c->get(SyncRepository::class)));
 
         $container->singleton(ProductsSyncController::class, static fn ($c) => new ProductsSyncController(
@@ -301,6 +386,16 @@ final class SyncModule implements ModuleInterface
             $c->get(OpeningStocksSyncService::class),
         ));
 
+        $container->singleton(CashTransactionsSyncController::class, static fn ($c) => new CashTransactionsSyncController(
+            $c->get(ResponseBuilder::class),
+            $c->get(CashTransactionsSyncService::class),
+        ));
+
+        $container->singleton(ExpensesSyncController::class, static fn ($c) => new ExpensesSyncController(
+            $c->get(ResponseBuilder::class),
+            $c->get(ExpensesSyncService::class),
+        ));
+
         $container->singleton(SyncController::class, static fn ($c) => new SyncController(
             $c->get(ResponseBuilder::class),
             $c->get(SyncService::class),
@@ -325,6 +420,8 @@ final class SyncModule implements ModuleInterface
             ['supplier-payments', SupplierPaymentsSyncController::class, 'push', 'pull'],
             ['inventory-adjustments', InventoryAdjustmentsSyncController::class, 'push', 'pull'],
             ['opening-stocks', OpeningStocksSyncController::class, 'push', 'pull'],
+            ['cash-transactions', CashTransactionsSyncController::class, 'push', 'pull'],
+            ['expenses', ExpensesSyncController::class, 'push', 'pull'],
         ];
 
         foreach ($this->prefixes() as $prefix) {

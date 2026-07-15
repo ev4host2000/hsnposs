@@ -22,6 +22,23 @@ class OpeningStockFinalizePostingStage extends PostingStage {
         : header.rowVersion + 1;
 
     if (context.stageData['idempotent_replay'] == true) {
+      final existing = await OpeningStockPostDb.loadOpeningStock(
+        context.txn,
+        header.id,
+      );
+      final localStatus = (existing?['openingStatus'] ?? '').toString();
+      if (localStatus == 'draft') {
+        await OpeningStockPostDb.finalizeOpeningStock(
+          context.txn,
+          openingStockId: header.id,
+          transactionVersion: nextTxnVersion,
+          rowVersion: nextRowVersion,
+          postedAt: postedAt,
+        );
+        context.stageData['next_transaction_version'] = nextTxnVersion;
+        context.stageData['next_row_version'] = nextRowVersion;
+        context.stageData['posted_at'] = postedAt;
+      }
       context.stageData['posted'] = true;
       context.stageData['final_status'] = 'posted';
       context.stageData['finalized_at'] = postedAt;

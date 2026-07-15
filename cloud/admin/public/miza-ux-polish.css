@@ -1,0 +1,331 @@
+/* =============================================================================
+   Miza Cloud — Production UX Polish
+   Accessibility, responsive fixes, loading, focus, scroll.
+   Does not change visual identity. Does not redesign pages.
+   ============================================================================= */
+
+/* Skip link */
+.skip-link {
+  position: absolute;
+  top: -100px;
+  right: var(--space-4, 16px);
+  z-index: 1000;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: var(--miza-accent, #5B5CEB);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  box-shadow: var(--miza-shadow-hover, 0 8px 24px rgba(15, 23, 42, 0.08));
+}
+
+.skip-link:focus {
+  top: var(--space-3, 12px);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(91, 92, 235, 0.35);
+}
+
+/* Focus visibility — all interactive controls */
+:where(a, button, .btn, .nav-btn, .stores-filter-chip, input, select, textarea, [tabindex]:not([tabindex="-1"])):focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring, 0 0 0 3px rgba(91, 92, 235, 0.22));
+}
+
+.nav-btn:focus-visible {
+  border-color: rgba(91, 92, 235, 0.35);
+}
+
+.stores-filter-chip:focus-visible {
+  border-color: rgba(91, 92, 235, 0.4);
+}
+
+/* Contrast polish for secondary copy (WCAG-friendlier on white) */
+.muted,
+.page-header .muted,
+.dash-page-desc,
+.stores-page-desc,
+.panel-head .muted,
+.field span,
+.kpi-hint,
+.dash-health-hint,
+.empty-state-text,
+.dash-empty .empty-state-text {
+  color: #475569;
+}
+
+.eyebrow {
+  color: #4F46E5;
+}
+
+/* Loading / busy */
+.main-area.is-loading {
+  position: relative;
+}
+
+.main-area.is-loading::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  background: rgba(245, 247, 251, 0.45);
+  pointer-events: none;
+}
+
+.main-area.is-loading::before {
+  content: "";
+  position: sticky;
+  top: 12px;
+  display: block;
+  width: 28px;
+  height: 28px;
+  margin: 0 auto 12px;
+  z-index: 41;
+  border: 2.5px solid rgba(91, 92, 235, 0.2);
+  border-top-color: var(--miza-accent, #5B5CEB);
+  border-radius: 50%;
+  animation: miza-spin 0.7s linear infinite;
+}
+
+@keyframes miza-spin {
+  to { transform: rotate(360deg); }
+}
+
+.btn.is-busy,
+.btn[aria-busy="true"] {
+  position: relative;
+  color: transparent !important;
+  pointer-events: none;
+}
+
+.btn.is-busy::after,
+.btn[aria-busy="true"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: miza-spin 0.65s linear infinite;
+  color: #fff;
+}
+
+.btn-secondary.is-busy::after,
+.btn-ghost.is-busy::after,
+.btn-outline.is-busy::after,
+.btn-danger.is-busy::after,
+.btn-success.is-busy::after,
+.btn-secondary[aria-busy="true"]::after,
+.btn-ghost[aria-busy="true"]::after {
+  border-color: rgba(15, 23, 42, 0.15);
+  border-top-color: #475569;
+  color: #475569;
+}
+
+/* Toast */
+.toast {
+  max-width: min(420px, calc(100vw - 32px));
+  text-align: center;
+  line-height: 1.4;
+}
+
+.toast.toast-success {
+  border-color: rgba(16, 185, 129, 0.28);
+  background: #ECFDF5;
+  color: #047857;
+}
+
+.toast.toast-error {
+  border-color: rgba(239, 68, 68, 0.28);
+  background: #FEF2F2;
+  color: #B91C1C;
+}
+
+.toast.toast-info {
+  border-color: var(--miza-border, #E6EAF0);
+  background: var(--miza-surface, #fff);
+  color: var(--miza-ink, #0F172A);
+}
+
+/* Modal UX */
+body.modal-open {
+  overflow: hidden;
+}
+
+.modal:not(.hidden) {
+  animation: miza-fade 0.14s ease;
+}
+
+@keyframes miza-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.modal-card {
+  max-height: min(90vh, 640px);
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-body {
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.modal-actions {
+  flex-wrap: wrap;
+}
+
+/* Sticky table headers inside scroll wrappers */
+.table-wrap {
+  max-height: min(70vh, 720px);
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.modern-table thead th,
+.stores-table thead th,
+.dash-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+/* Reduce layout shift while KPI grids populate */
+.dash-kpi-grid,
+.kpi-grid,
+.stores-summary,
+.cc-summary-cards {
+  min-height: 88px;
+}
+
+.dash-timeline,
+#dash-alerts,
+#obs-alerts {
+  min-height: 64px;
+}
+
+/* Form usability */
+.field input:user-invalid,
+.field select:user-invalid,
+.field textarea:user-invalid {
+  border-color: #F87171;
+}
+
+.error:not(.hidden) {
+  display: block;
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.18);
+  color: #B91C1C;
+}
+
+input[type="search"].search-input {
+  width: 100%;
+}
+
+.ltr-cell {
+  direction: ltr;
+  text-align: right;
+  unicode-bidi: plaintext;
+}
+
+.uppercase-input {
+  text-transform: uppercase;
+}
+
+/* Touch targets */
+@media (pointer: coarse) {
+  .btn,
+  .nav-btn,
+  .stores-filter-chip {
+    min-height: 44px;
+  }
+}
+
+/* Critical: logout must remain available on tablet/mobile */
+@media (max-width: 900px) {
+  .sidebar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    padding-bottom: 12px;
+  }
+
+  .sidebar-brand {
+    flex: 1 1 auto;
+    min-width: 160px;
+  }
+
+  .sidebar-nav {
+    flex: 1 1 100%;
+    order: 3;
+  }
+
+  .sidebar-logout {
+    display: inline-flex !important;
+    width: auto;
+    min-width: 88px;
+    order: 2;
+    margin: 0;
+  }
+
+  .nav-btn {
+    min-width: 0;
+  }
+
+  .table-wrap {
+    max-height: none;
+  }
+
+  .modal-actions .btn {
+    flex: 1 1 auto;
+  }
+}
+
+@media (max-width: 520px) {
+  .action-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .action-group .btn {
+    flex: 1 1 calc(50% - 4px);
+  }
+
+  .filter-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .filter-row .search-input,
+  .filter-row .btn {
+    width: 100%;
+  }
+}
+
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .main-area.is-loading::before,
+  .btn.is-busy::after,
+  .btn[aria-busy="true"]::after {
+    animation: none;
+    border-top-color: var(--miza-accent, #5B5CEB);
+  }
+}

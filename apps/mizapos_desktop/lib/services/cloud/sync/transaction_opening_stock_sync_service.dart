@@ -77,7 +77,7 @@ class TransactionOpeningStockSyncService {
       notes: notes,
     );
 
-    await TransactionSyncOutboxWriter.record(
+    await TransactionSyncOutboxWriter.recordBestEffort(
       entityType: OpeningStockSyncConstants.entityType,
       operation: 'create',
       entityId: openingStockId,

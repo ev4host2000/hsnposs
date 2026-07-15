@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:async' show unawaited;
 import 'package:mizapos_desktop/screens/shared/ui_style_tokens.dart';
 
 import 'package:flutter/foundation.dart';
@@ -6,15 +7,39 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'package:mizapos_desktop/config/remote_signup_config.dart';
+import 'package:mizapos_desktop/config/subscription_voucher_config.dart';
 import 'package:mizapos_desktop/l10n/app_localizations.dart';
+import 'package:mizapos_desktop/l10n/app_localizations_home.dart';
 import 'package:mizapos_desktop/services/database_service.dart';
 import 'package:mizapos_desktop/services/accounting_service.dart';
+import 'package:mizapos_desktop/services/license_gate.dart';
 import 'package:mizapos_desktop/services/voucher_api.dart';
 import 'package:mizapos_desktop/services/voucher_session_manager.dart';
 import 'package:mizapos_desktop/theme/app_design.dart';
 import 'package:mizapos_desktop/ui/country_flag.dart';
 import 'package:mizapos_desktop/ui/dial_code_picker_field.dart';
 import 'package:mizapos_desktop/ui/subscription_plan_card.dart';
+import 'package:mizapos_desktop/ui/subscription_coverage_card.dart';
+import 'package:mizapos_desktop/widgets/agents_dialog.dart';
+
+bool subscriberLicensedWithoutVoucher(AccountingService? svc) {
+  final gate = svc?.licenseGate;
+  if (gate == null) return false;
+  final now = DateTime.now();
+  if (svc?.hasActiveEmailTrialCoverage(now) ?? false) return true;
+  if (svc?.hasActiveAnnualSubscriptionCoverage(now) ?? false) return true;
+  switch (gate.coverageKind(now)) {
+    case LicenseCoverageKind.emailTrial:
+    case LicenseCoverageKind.annual:
+    case LicenseCoverageKind.grandfather:
+    case LicenseCoverageKind.legacyActivated:
+      return true;
+    case LicenseCoverageKind.none:
+    case LicenseCoverageKind.pendingActivation:
+    case LicenseCoverageKind.accessSuspended:
+      return false;
+  }
+}
 
 /// حوار تفعيل الاشتراك بقسيمة (Miza-XXXX-XXXX-XXXX).
 ///
@@ -48,8 +73,13 @@ Future<VoucherStatus?> showVoucherActivationDialog(
 Future<String?> showSubscriberRegistrationWelcomeDialog(
   BuildContext context, {
   required String fullName,
+  bool emailTrialMode = false,
+  int trialDays = 2,
 }) {
   final loc = AppLocalizations.of(context);
+  final effectiveTrialMode =
+      emailTrialMode || RemoteSignupConfig.activationServerEnabled;
+  final days = trialDays.clamp(1, 90);
   return showDialog<String>(
     context: context,
     barrierDismissible: false,
@@ -151,8 +181,47 @@ Future<String?> showSubscriberRegistrationWelcomeDialog(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      if (effectiveTrialMode) ...[
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.green.shade50,
+                            borderRadius: AppDesign.borderRadiusMd,
+                            border: Border.all(
+                              color: Colors.green.shade300.withValues(
+                                alpha: 0.65,
+                              ),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.verified_rounded,
+                                color: Colors.green.shade700,
+                                size: 22,
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  loc.authSubscriberWelcomeTrialBadge(days),
+                                  style: theme.textTheme.labelLarge?.copyWith(
+                                    color: Colors.green.shade900,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
                       Text(
-                        loc.authSubscriberWelcomeBody,
+                        effectiveTrialMode
+                            ? loc.authSubscriberWelcomeBodyEmailTrial(days)
+                            : loc.authSubscriberWelcomeBody,
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: cs.onSurface.withValues(alpha: 0.72),
                           height: 1.45,
@@ -160,31 +229,51 @@ Future<String?> showSubscriberRegistrationWelcomeDialog(
                         ),
                       ),
                       const SizedBox(height: 16),
-                      FilledButton.icon(
-                        style: FilledButton.styleFrom(
-                          minimumSize:
-                              const Size.fromHeight(AppDesign.buttonHeight),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: AppDesign.borderRadiusMd,
+                      if (effectiveTrialMode) ...[
+                        FilledButton.icon(
+                          style: FilledButton.styleFrom(
+                            minimumSize:
+                                const Size.fromHeight(AppDesign.buttonHeight),
+                            backgroundColor: Colors.green.shade700,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: AppDesign.borderRadiusMd,
+                            ),
                           ),
+                          onPressed: () => Navigator.pop(ctx, 'try'),
+                          icon: const Icon(Icons.play_circle_outline_rounded,
+                              size: 20),
+                          label: Text(loc.authSubscriberWelcomeTryApp),
                         ),
-                        onPressed: () => Navigator.pop(ctx, 'activate'),
-                        icon: const Icon(Icons.confirmation_number_outlined,
-                            size: 20),
-                        label: Text(loc.authSubscriberWelcomeActivateVoucher),
-                      ),
-                      const SizedBox(height: 8),
-                      TextButton.icon(
-                        style: TextButton.styleFrom(
-                          minimumSize:
-                              const Size.fromHeight(AppDesign.buttonHeight - 4),
-                          foregroundColor: cs.primary,
+                      ] else ...[
+                        FilledButton.icon(
+                          style: FilledButton.styleFrom(
+                            minimumSize:
+                                const Size.fromHeight(AppDesign.buttonHeight),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: AppDesign.borderRadiusMd,
+                            ),
+                          ),
+                          onPressed: () => Navigator.pop(ctx, 'activate'),
+                          icon: const Icon(Icons.confirmation_number_outlined,
+                              size: 20),
+                          label:
+                              Text(loc.authSubscriberWelcomeActivateVoucher),
                         ),
-                        onPressed: () => Navigator.pop(ctx, 'try'),
-                        icon: const Icon(Icons.play_circle_outline_rounded,
-                            size: 20),
-                        label: Text(loc.authSubscriberWelcomeTryApp),
-                      ),
+                        const SizedBox(height: 8),
+                        TextButton.icon(
+                          style: TextButton.styleFrom(
+                            minimumSize: const Size.fromHeight(
+                              AppDesign.buttonHeight - 4,
+                            ),
+                            foregroundColor: cs.primary,
+                          ),
+                          onPressed: () => Navigator.pop(ctx, 'try'),
+                          icon: const Icon(Icons.play_circle_outline_rounded,
+                              size: 20),
+                          label: Text(loc.authSubscriberWelcomeTryApp),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -218,6 +307,56 @@ class _VoucherActivationDialogState extends State<_VoucherActivationDialog> {
   /// يُغلق حوار الترحيب.
   bool _holdRedeemForWelcome = false;
 
+  bool _hasActiveEmailTrial() {
+    final gate = widget.accountingService?.licenseGate;
+    return gate?.hasActiveEmailTrial(DateTime.now()) ?? false;
+  }
+
+  bool _dialogSubscriberLicensedWithoutVoucher() =>
+      subscriberLicensedWithoutVoucher(widget.accountingService);
+
+  bool _shouldShowVoucherRedeemPanel(VoucherStatus status) => false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_maybeAutoDismissLicensedSubscriber());
+    });
+  }
+
+  Future<void> _maybeAutoDismissLicensedSubscriber() async {
+    if (!mounted || !_mgr.hasSession) return;
+    final svc = widget.accountingService;
+    try {
+      await svc?.refreshSubscriptionLicenseFromServer();
+      await svc?.syncLicenseGate();
+    } catch (_) {
+      /* تجاهل */
+    }
+    if (!mounted) return;
+    if (subscriberLicensedWithoutVoucher(svc)) {
+      _closeDialogWithCurrentStatus();
+      return;
+    }
+    if (_mgr.status.isActive) return;
+    try {
+      await svc?.syncStaffSessionAfterVoucherAuth();
+      await svc?.refreshSubscriptionLicenseFromServer();
+      await svc?.syncLicenseGate();
+    } catch (_) {
+      /* تجاهل */
+    }
+    if (!mounted) return;
+    if (subscriberLicensedWithoutVoucher(svc)) {
+      _closeDialogWithCurrentStatus();
+    }
+  }
+
+  void _closeDialogWithCurrentStatus() {
+    Navigator.of(context).pop(_mgr.statusNotifier.value);
+  }
+
   void _clearRegisterWelcomeHold() {
     if (_holdRedeemForWelcome) {
       setState(() => _holdRedeemForWelcome = false);
@@ -226,12 +365,20 @@ class _VoucherActivationDialogState extends State<_VoucherActivationDialog> {
 
   Future<void> _handleRegisterSuccess(String fullName) async {
     try {
+      await widget.accountingService?.syncLicenseGate();
+      final gate = widget.accountingService?.licenseGate;
+      final now = DateTime.now();
+      final trialDays = gate?.emailTrialDaysRemaining(now) ?? 0;
+      final emailTrial = gate?.hasActiveEmailTrial(now) ??
+          RemoteSignupConfig.activationServerEnabled;
       final welcomeAction = await showSubscriberRegistrationWelcomeDialog(
         context,
         fullName: fullName,
+        emailTrialMode: emailTrial,
+        trialDays: trialDays > 0 ? trialDays : 2,
       );
       if (!mounted) return;
-      if (welcomeAction == 'try') {
+      if (welcomeAction != 'activate') {
         Navigator.of(context).pop(_mgr.statusNotifier.value);
       }
     } finally {
@@ -286,9 +433,13 @@ class _VoucherActivationDialogState extends State<_VoucherActivationDialog> {
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          const SizedBox(
+                          SizedBox(
                             width: 340,
-                            child: SubscriptionPlanCard(rail: true),
+                            child: SubscriptionPlanCard(
+                              rail: true,
+                              onSubscribeTap: () =>
+                                  showAgentsDialog(context),
+                            ),
                           ),
                           VerticalDivider(
                             width: 1,
@@ -348,7 +499,8 @@ class _VoucherActivationDialogState extends State<_VoucherActivationDialog> {
         onRegisterSuccess: _handleRegisterSuccess,
       );
     }
-    if (status.isActive) {
+    // نظام القسيمة ملغى: لا لوحة «قسيمة نشطة» حتى لو بقيت حالة قديمة في الذاكرة.
+    if (SubscriptionVoucherConfig.enabled && status.isActive) {
       return _ActiveSubscriptionPanel(
         status: status,
         session: session,
@@ -363,9 +515,38 @@ class _VoucherActivationDialogState extends State<_VoucherActivationDialog> {
         child: Center(child: CircularProgressIndicator()),
       );
     }
-    return _RedeemVoucherPanel(
-      embedPlan: embedPlan,
-      onSuccess: () => setState(() {}),
+    final gate = widget.accountingService?.licenseGate;
+    final now = DateTime.now();
+    final svc = widget.accountingService;
+    if (svc?.hasActiveEmailTrialCoverage(now) ?? false) {
+      final days = gate?.emailTrialDaysRemaining(now) ??
+          svc?.remoteTrialDaysRemaining ??
+          0;
+      return _EmailTrialActivePanel(
+        embedPlan: embedPlan,
+        daysRemaining: days > 0 ? days : 1,
+        onContinue: _closeDialogWithCurrentStatus,
+      );
+    }
+    if (svc?.hasActiveAnnualSubscriptionCoverage(now) ?? false) {
+      return _SubscriberLicensedContinuePanel(
+        onContinue: _closeDialogWithCurrentStatus,
+      );
+    }
+    if (gate != null && gate.hasActiveEmailTrial(now)) {
+      return _EmailTrialActivePanel(
+        embedPlan: embedPlan,
+        daysRemaining: gate.emailTrialDaysRemaining(now),
+        onContinue: _closeDialogWithCurrentStatus,
+      );
+    }
+    if (_dialogSubscriberLicensedWithoutVoucher()) {
+      return _SubscriberLicensedContinuePanel(
+        onContinue: _closeDialogWithCurrentStatus,
+      );
+    }
+    return _SubscriberPendingPanel(
+      onContinue: _closeDialogWithCurrentStatus,
     );
   }
 }
@@ -451,7 +632,7 @@ class _DialogHeader extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: cs.primary.withValues(alpha: 0.18)),
           ),
-          child: Icon(Icons.confirmation_number_outlined, color: cs.primary),
+          child: Icon(Icons.verified_user_outlined, color: cs.primary),
         ),
         const SizedBox(width: 12),
         Expanded(
@@ -459,7 +640,7 @@ class _DialogHeader extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                loc.voucherDialogTitle,
+                loc.activationDialogTitle,
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w800,
                     ),
@@ -568,7 +749,10 @@ class _SignInOrRegisterPanelState extends State<_SignInOrRegisterPanel>
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (widget.embedPlan) ...[
-          const SubscriptionPlanCard(compact: true),
+          SubscriptionPlanCard(
+            compact: true,
+            onSubscribeTap: () => showAgentsDialog(context),
+          ),
           const SizedBox(height: 14),
         ],
         DecoratedBox(
@@ -631,6 +815,7 @@ class _LoginFormState extends State<_LoginForm> {
   bool _obscure = true;
   bool _rememberLogin = true;
   String? _error;
+  String? _orgId;
 
   /// البريد المحفوظ في كاش الدخول المحلي (للسماح بالدخول دون إنترنت بعد
   /// أول دخول ناجح). يظهر تلميح هادئ تحت الزرّ يخبر المستخدم بهذه الميزة.
@@ -639,20 +824,57 @@ class _LoginFormState extends State<_LoginForm> {
   @override
   void initState() {
     super.initState();
+    unawaited(_loadOrgId());
     final mgr = VoucherSessionManager.instance;
+    // إن وُجدت جلسة حسابي، اعتمد بريدها — لا بريد قديم محفوظ (مثل info@…).
+    final liveEmail = mgr.sessionNotifier.value?.email.trim() ?? '';
+    if (liveEmail.contains('@')) {
+      _email.text = liveEmail;
+    }
     mgr.rememberLoginEnabled().then((remember) async {
       if (!mounted) return;
       setState(() => _rememberLogin = remember);
-      if (remember) {
+      if (_email.text.trim().isEmpty && remember) {
         final e = await mgr.readRememberedEmail();
         if (mounted && e.isNotEmpty) _email.text = e;
       }
     });
     mgr.offlineCachedEmail().then((e) {
-      if (mounted && e.isNotEmpty) {
-        setState(() => _cachedOfflineEmail = e);
-      }
+      if (!mounted || e.isEmpty) return;
+      final live = mgr.sessionNotifier.value?.email.trim().toLowerCase() ?? '';
+      // لا تعرض تلميح أوفلاين لبريد مختلف عن جلسة حسابي الحالية.
+      if (live.isNotEmpty && e.trim().toLowerCase() != live) return;
+      setState(() => _cachedOfflineEmail = e);
     });
+  }
+
+  Future<void> _loadOrgId() async {
+    try {
+      final sessionOrg =
+          widget.accountingService?.session?.organizationId.trim() ?? '';
+      if (sessionOrg.isNotEmpty) {
+        if (!mounted) return;
+        setState(() => _orgId = sessionOrg);
+        return;
+      }
+      final voucherOrg =
+          VoucherSessionManager.instance.sessionNotifier.value?.organizationId
+                  .trim() ??
+              '';
+      if (voucherOrg.isNotEmpty) {
+        if (!mounted) return;
+        setState(() => _orgId = voucherOrg);
+        return;
+      }
+      final db = await DatabaseService().database;
+      final rows = await db.query('organizations', limit: 1);
+      if (!mounted) return;
+      setState(() {
+        _orgId = rows.isEmpty ? null : (rows.first['id'] as String? ?? '');
+      });
+    } on Object {
+      /* ignore */
+    }
   }
 
   @override
@@ -670,6 +892,11 @@ class _LoginFormState extends State<_LoginForm> {
       setState(() => _error = loc.voucherValidationCredentials);
       return;
     }
+    final org = (_orgId ?? '').trim();
+    if (org.isEmpty) {
+      setState(() => _error = loc.voucherErrorMissingOrg);
+      return;
+    }
     setState(() {
       _busy = true;
       _error = null;
@@ -679,6 +906,7 @@ class _LoginFormState extends State<_LoginForm> {
       final result = await mgr.loginResilient(
         email: email,
         password: pwd,
+        organizationId: org,
         rememberLogin: _rememberLogin,
       );
       try {
@@ -701,6 +929,12 @@ class _LoginFormState extends State<_LoginForm> {
         email: email,
         password: pwd,
       );
+      await widget.accountingService?.syncLicenseGate();
+      if (!mounted) return;
+      if (subscriberLicensedWithoutVoucher(widget.accountingService)) {
+        Navigator.of(context).pop(VoucherSessionManager.instance.statusNotifier.value);
+        return;
+      }
       widget.onDone();
     } on VoucherOfflineException {
       if (!mounted) return;
@@ -768,8 +1002,14 @@ class _LoginFormState extends State<_LoginForm> {
               dialogError = null;
             });
             try {
+              final org = (_orgId ?? '').trim();
+              if (org.isEmpty) {
+                setDialogState(() => dialogError = loc.voucherErrorMissingOrg);
+                return;
+              }
               await VoucherSessionManager.instance.requestPasswordReset(
                 email: em,
+                organizationId: org,
               );
               if (!ctx.mounted) return;
               Navigator.pop(ctx);
@@ -1192,6 +1432,105 @@ class _RegisterFormState extends State<_RegisterForm> {
           ),
         ],
       ),
+    );
+  }
+}
+
+/* ---------------- Email trial / licensed (no voucher) ---------------- */
+
+class _SubscriberLicensedContinuePanel extends StatelessWidget {
+  const _SubscriberLicensedContinuePanel({required this.onContinue});
+
+  final VoidCallback onContinue;
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context);
+    final email =
+        VoucherSessionManager.instance.sessionNotifier.value?.email.trim();
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SubscriptionCoverageCard(
+          kind: SubscriptionCoverageVisual.annual,
+          email: (email != null && email.isNotEmpty) ? email : null,
+          onPrimaryTap: onContinue,
+          primaryLabel: loc.subscriptionCoverageAnnualContinue,
+        ),
+      ],
+    );
+  }
+}
+
+class _SubscriberPendingPanel extends StatelessWidget {
+  const _SubscriberPendingPanel({required this.onContinue});
+
+  final VoidCallback onContinue;
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context);
+    final cs = Theme.of(context).colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: cs.primaryContainer.withValues(alpha: 0.45),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: cs.primary.withValues(alpha: 0.25)),
+          ),
+          child: Text(
+            loc.activationDialogCoveragePending,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  height: 1.45,
+                  fontWeight: FontWeight.w600,
+                ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        FilledButton(
+          onPressed: onContinue,
+          child: Text(loc.close),
+        ),
+      ],
+    );
+  }
+}
+
+class _EmailTrialActivePanel extends StatelessWidget {
+  const _EmailTrialActivePanel({
+    required this.embedPlan,
+    required this.daysRemaining,
+    required this.onContinue,
+  });
+
+  final bool embedPlan;
+  final int daysRemaining;
+  final VoidCallback onContinue;
+
+  @override
+  Widget build(BuildContext context) {
+    final email =
+        VoucherSessionManager.instance.sessionNotifier.value?.email.trim();
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (embedPlan) ...[
+          const SubscriptionPlanCard(compact: true),
+          const SizedBox(height: 14),
+        ],
+        SubscriptionCoverageCard(
+          kind: SubscriptionCoverageVisual.trial,
+          daysRemaining: daysRemaining,
+          email: (email != null && email.isNotEmpty) ? email : null,
+          onAgentsTap: () => showAgentsDialog(context),
+          onPrimaryTap: onContinue,
+        ),
+      ],
     );
   }
 }
@@ -2613,6 +2952,8 @@ String _humanError(AppLocalizations loc, String code) {
       return loc.voucherErrorInvalidCode;
     case 'voucher_revoked':
       return loc.voucherErrorRevoked;
+    case 'subscription_expired':
+      return loc.licenseSubscriptionRequired;
     case 'voucher_bound_to_other':
       return loc.voucherErrorBoundToOther;
     case 'devices_limit_reached':
@@ -2639,6 +2980,10 @@ String _humanError(AppLocalizations loc, String code) {
       return loc.voucherErrorOffline;
     case 'email_not_found':
       return loc.authResetEmailNotFound;
+    case 'organization_required':
+    case 'organization_mismatch':
+    case 'ambiguous_organization':
+      return loc.voucherErrorMissingOrg;
     case 'smtp_missing':
       return loc.authResetSmtpMissing;
     case 'mail_failed':

@@ -9,6 +9,7 @@ use MizaCloud\Core\Container\Container;
 use MizaCloud\Core\Database\Connection;
 use MizaCloud\Core\Http\ResponseBuilder;
 use MizaCloud\Core\Logging\Logger;
+use MizaCloud\Core\Mail\SmtpMailer;
 use MizaCloud\Core\Modules\ModuleInterface;
 use MizaCloud\Core\Router\Router;
 use MizaCloud\Modules\Auth\Controllers\AuthController;
@@ -43,6 +44,10 @@ final class AuthModule implements ModuleInterface
 
         $container->singleton(AuthRepository::class, static fn ($c) => new AuthRepository($c->get(Connection::class)));
 
+        $container->singleton(SmtpMailer::class, static fn ($c) => new SmtpMailer(
+            $c->get(Config::class),
+        ));
+
         $container->singleton(AuthService::class, static function (Container $c): AuthService {
             $jwtConfig = $c->get(Config::class)->get('jwt', []);
             if (!is_array($jwtConfig)) {
@@ -54,6 +59,7 @@ final class AuthModule implements ModuleInterface
                 jwt: $c->get(JwtService::class),
                 scopes: $c->get(RoleScopeResolver::class),
                 logger: $c->get(Logger::class),
+                mailer: $c->get(SmtpMailer::class),
                 accessTtl: (int) ($jwtConfig['access_ttl'] ?? 900),
                 refreshTtl: (int) ($jwtConfig['refresh_ttl'] ?? 2592000),
             );
@@ -71,6 +77,8 @@ final class AuthModule implements ModuleInterface
 
         foreach ($this->prefixes() as $prefix) {
             $router->post("{$prefix}/login", [$controller, 'login']);
+            $router->post("{$prefix}/password/forgot", [$controller, 'forgotPassword']);
+            $router->post("{$prefix}/login/pairing", [$controller, 'loginPairing']);
             $router->post("{$prefix}/token/refresh", [$controller, 'refresh']);
             $router->post("{$prefix}/logout", [$controller, 'logout']);
             $router->get("{$prefix}/me", [$controller, 'me']);

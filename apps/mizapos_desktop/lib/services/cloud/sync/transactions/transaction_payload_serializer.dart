@@ -32,6 +32,13 @@ class TransactionPayloadSerializer {
         ? Map<String, dynamic>.from(metadataRaw)
         : <String, dynamic>{};
 
+    // Preserve post/void effect sections that may live at aggregate root.
+    for (final key in const ['inventory', 'accounting', 'cash']) {
+      if (json[key] is List && metadata[key] == null) {
+        metadata[key] = json[key];
+      }
+    }
+
     return MapTransactionAggregate.fromParts(
       header: header,
       lines: lines,

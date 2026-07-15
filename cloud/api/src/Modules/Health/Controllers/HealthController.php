@@ -21,7 +21,8 @@ final class HealthController extends Controller
 
     public function index(Request $request): Response
     {
-        $data = $this->service->summary();
+        $detailed = $this->service->isDetailAuthorized($request);
+        $data = $this->service->summary($detailed);
         $status = $data['status'] === 'healthy' ? 200 : 503;
 
         return $this->responses->success($data, status: $status);
@@ -34,13 +35,16 @@ final class HealthController extends Controller
 
     public function version(Request $request): Response
     {
-        return $this->responses->success($this->service->version());
+        $detailed = $this->service->isDetailAuthorized($request);
+
+        return $this->responses->success($this->service->version($detailed));
     }
 
     public function database(Request $request): Response
     {
-        $data = $this->service->database();
-        $status = $data['connected'] ? 200 : 503;
+        $detailed = $this->service->isDetailAuthorized($request);
+        $data = $this->service->database($detailed);
+        $status = !empty($data['connected']) ? 200 : 503;
 
         return $this->responses->success($data, status: $status);
     }

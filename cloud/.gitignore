@@ -1,0 +1,11 @@
+.env
+.env.local
+.env.staging
+deploy/ssl/
+deploy/backups/
+*.pem
+*.key
+api/tools/
+api/composer.phar
+api/vendor/
+_deploy_cash_sync/

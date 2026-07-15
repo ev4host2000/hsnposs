@@ -1,7 +1,7 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-    Static + optional live validation for cloud/api/database SQL files.
+    Static + optional live validation for cloud/api/database SQL files (001-017).
 #>
 param(
     [string]$Database = 'mizacloud_validate',
@@ -12,7 +12,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $DbDir = $PSScriptRoot
 
-$OrderedFiles = @(
+$CoreFiles = @(
     '001_initial_schema.sql',
     '002_indexes.sql',
     '003_constraints.sql',
@@ -23,6 +23,19 @@ $OrderedFiles = @(
     '008_permissions.sql',
     '009_migrations.sql'
 )
+
+$ExtensionFiles = @(
+    '010_catalog_taxes_price_lists.sql',
+    '011_sales_invoice_transaction_version.sql',
+    '012_sales_invoice_posted_at.sql',
+    '013_purchase_invoice_transaction_version.sql',
+    '014_return_transaction_version.sql',
+    '015_payment_transaction_version.sql',
+    '016_inventory_adjustment_transaction_version.sql',
+    '017_opening_stock_transaction_version.sql'
+)
+
+$OrderedFiles = $CoreFiles + $ExtensionFiles
 
 $ExpectedTables = @(
     'companies', 'branches', 'organization_settings', 'branch_settings', 'device_settings',
@@ -70,6 +83,28 @@ foreach ($file in $OrderedFiles) {
     $allOk = (Test-Check $ok $msg) -and $allOk
 }
 
+# Unique schema_migrations version numbers across 010-017
+$versionMap = @{}
+foreach ($file in $ExtensionFiles) {
+    $content = Get-Content (Join-Path $DbDir $file) -Raw
+    if ($content -match "VALUES\s*\(\s*'(\d{3})'") {
+        $ver = $Matches[1]
+        if ($versionMap.ContainsKey($ver)) {
+            $allOk = (Test-Check $false ("Duplicate migration version $ver in " + $file + " and " + $versionMap[$ver])) -and $allOk
+        }
+        else {
+            $versionMap[$ver] = $file
+        }
+    }
+}
+$allOk = (Test-Check ($versionMap.Count -eq $ExtensionFiles.Count) ("Unique extension versions 010-017 (" + $versionMap.Count + "/8)")) -and $allOk
+
+$installAll = Get-Content (Join-Path $DbDir 'install_all.sql') -Raw
+foreach ($file in $OrderedFiles) {
+    $ok = $installAll -match [regex]::Escape($file)
+    $allOk = (Test-Check $ok ("install_all.sql references " + $file)) -and $allOk
+}
+
 $schema = Get-Content (Join-Path $DbDir '001_initial_schema.sql') -Raw
 foreach ($table in $ExpectedTables) {
     $pattern = 'CREATE TABLE ' + $table + '\s*\('
@@ -115,13 +150,16 @@ if (-not $SkipLive) {
     $psql = $null
     $candidates = @(
         'psql',
+        'D:\MizaPos\cloud\api\tools\pgsql\pgsql\bin\psql.exe',
         'C:\Program Files\PostgreSQL\17\bin\psql.exe',
         'C:\Program Files\PostgreSQL\16\bin\psql.exe',
         'C:\Program Files\PostgreSQL\15\bin\psql.exe'
     )
     foreach ($c in $candidates) {
-        if (Get-Command $c -ErrorAction SilentlyContinue) { $psql = $c; break }
-        if (Test-Path $c) { $psql = $c; break }
+        if ($c -eq 'psql') {
+            if (Get-Command psql -ErrorAction SilentlyContinue) { $psql = 'psql'; break }
+        }
+        elseif (Test-Path $c) { $psql = $c; break }
     }
 
     if (-not $psql) {
@@ -135,25 +173,29 @@ if (-not $SkipLive) {
             Write-Host '[SKIP] Cannot create temp database' -ForegroundColor Yellow
         }
         else {
-            $combined = Join-Path $env:TEMP ("miza_validate_" + [guid]::NewGuid().ToString('N') + '.sql')
-            $parts = @()
-            foreach ($f in @('001_initial_schema.sql','002_indexes.sql','003_constraints.sql','004_seed_data.sql','005_functions.sql','006_triggers.sql','007_views.sql')) {
-                $parts += Get-Content (Join-Path $DbDir $f) -Raw
+            Push-Location $DbDir
+            try {
+                & $psql -U $PostgresUser -d $Database -v ON_ERROR_STOP=1 -f install_all.sql
+                $liveOk = ($LASTEXITCODE -eq 0)
+                $allOk = (Test-Check $liveOk ("Live install_all.sql on " + $Database)) -and $allOk
+
+                if ($liveOk) {
+                    $tableCount = & $psql -U $PostgresUser -d $Database -t -A -c "SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE';"
+                    $allOk = (Test-Check ([int]$tableCount -ge 44) ("Tables created - " + $tableCount)) -and $allOk
+
+                    $seedCount = & $psql -U $PostgresUser -d $Database -t -A -c "SELECT count(*) FROM subscription_plans;"
+                    $allOk = (Test-Check ([int]$seedCount -eq 5) ("Seed plans - " + $seedCount)) -and $allOk
+
+                    $migCount = & $psql -U $PostgresUser -d $Database -t -A -c "SELECT count(*) FROM schema_migrations WHERE version >= '010';"
+                    $allOk = (Test-Check ([int]$migCount -eq 8) ("Extension migrations 010-017 - " + $migCount)) -and $allOk
+
+                    $postedAt = & $psql -U $PostgresUser -d $Database -t -A -c "SELECT count(*) FROM information_schema.columns WHERE table_name='sales_invoices' AND column_name='posted_at';"
+                    $allOk = (Test-Check ([int]$postedAt -eq 1) 'sales_invoices.posted_at column') -and $allOk
+                }
             }
-            Set-Content -Path $combined -Value ($parts -join "`n") -Encoding UTF8
-
-            & $psql -U $PostgresUser -d $Database -v ON_ERROR_STOP=1 -f $combined
-            $liveOk = ($LASTEXITCODE -eq 0)
-            $allOk = (Test-Check $liveOk ("Live apply 001-007 on " + $Database)) -and $allOk
-
-            if ($liveOk) {
-                $tableCount = & $psql -U $PostgresUser -d $Database -t -A -c "SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE';"
-                $allOk = (Test-Check ([int]$tableCount -ge 44) ("Tables created - " + $tableCount)) -and $allOk
-                $seedCount = & $psql -U $PostgresUser -d $Database -t -A -c "SELECT count(*) FROM subscription_plans;"
-                $allOk = (Test-Check ([int]$seedCount -eq 5) ("Seed plans - " + $seedCount)) -and $allOk
+            finally {
+                Pop-Location
             }
-
-            Remove-Item $combined -Force -ErrorAction SilentlyContinue
             & $psql -U $PostgresUser -d postgres -c ("DROP DATABASE IF EXISTS " + $Database) 2>$null | Out-Null
         }
     }

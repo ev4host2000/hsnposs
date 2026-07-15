@@ -14,6 +14,7 @@ use RuntimeException;
 trait PurchaseInvoiceDraftLww
 {
     use PurchaseInvoicePostLww;
+    use PurchaseInvoiceVoidLww;
 
     /**
      * @param array<string, mixed> $payloadJson
@@ -31,6 +32,17 @@ trait PurchaseInvoiceDraftLww
         /** @var SyncRepositorySupport $this */
         if ($operation === 'post') {
             return $this->applyPurchaseInvoicePost(
+                $companyId,
+                $branchId,
+                $entityId,
+                $payloadJson,
+                $clientRowVersion,
+                $originDeviceId,
+            );
+        }
+
+        if ($operation === 'void') {
+            return $this->applyPurchaseInvoiceVoid(
                 $companyId,
                 $branchId,
                 $entityId,
@@ -60,14 +72,29 @@ trait PurchaseInvoiceDraftLww
         }
 
         $existing = $this->fetchPurchaseInvoiceRow($companyId, $entityId);
+        // Idempotent create: invoice already on server → success (do not rewrite posted rows).
         if ($operation === 'create' && $existing !== null && ($existing['deleted_at'] ?? null) === null) {
-            throw new HttpException('conflict', 'Invoice already exists', 409);
+            $status = (string) ($existing['invoice_status'] ?? 'draft');
+            $linesForEnvelope = is_array($lines) ? $lines : [];
+
+            return $this->buildAggregateEnvelope(
+                $companyId,
+                $branchId,
+                $entityId,
+                $header,
+                $linesForEnvelope,
+                $metadata,
+                (int) ($existing['row_version'] ?? $clientRowVersion),
+                (int) ($existing['transaction_version'] ?? 0),
+                $status !== '' ? $status : 'draft',
+                $originDeviceId,
+            );
         }
         if ($operation === 'update') {
             if ($existing === null || ($existing['deleted_at'] ?? null) !== null) {
-                throw new HttpException('not_found', 'Draft invoice not found', 404);
-            }
-            if (($existing['invoice_status'] ?? '') !== 'draft') {
+                // تحديث لمسودة غير موجودة بعد — عاملها كإنشاء.
+                $operation = 'create';
+            } elseif (($existing['invoice_status'] ?? '') !== 'draft') {
                 throw new HttpException('invoice_not_editable', 'Only draft invoices can be updated', 409);
             }
         }

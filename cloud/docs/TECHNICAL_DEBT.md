@@ -14,8 +14,8 @@
 
 | ID | Item | Area | Notes |
 |----|------|------|-------|
-| H-01 | Duplicate `schema_migrations` version `012` | Cloud DB | Two files: `012_sales_invoice_posted_at.sql` + `012_purchase_invoice_transaction_version.sql`; `ON CONFLICT DO NOTHING` makes order non-deterministic |
-| H-02 | `validate_sql.ps1` / DB README stop at 009 | Cloud ops | Does not validate 010–016 tables |
+| H-01 | Duplicate `schema_migrations` version `012` | Cloud DB | **Fixed** — purchase renumbered to `013_purchase_invoice_transaction_version.sql` |
+| H-02 | `validate_sql.ps1` / DB README stop at 009 | Cloud ops | **Fixed** — validates 010–017 + `install_all.sql` live |
 | H-03 | Integration test flakiness (`sync_changelog` pollution) | Tests | Invoice/return benchmarks fail on shared dev DB; use sequence rewind + unique entity IDs |
 | H-04 | `updateProductDetails(stockQty)` bypasses sync | Mobile | Direct `products.stockQty` update — not opening_stock/adjustment |
 | H-05 | Desktop `lib/accounting_service.dart` not on transaction sync | Desktop | Mobile canonical; desktop still local-only for stock paths |

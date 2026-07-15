@@ -17,6 +17,7 @@ class CloudSecureStoragePlaceholder implements CloudSecureStorage {
   static const _keyCompanyId = 'cloud.secure.company_id';
   static const _keyBranchId = 'cloud.secure.branch_id';
   static const _keyUserId = 'cloud.secure.user_id';
+  static const _keyCloudUsername = 'cloud.secure.cloud_username';
 
   @override
   Future<void> writeAccessToken(String value) async =>
@@ -98,6 +99,16 @@ class CloudSecureStoragePlaceholder implements CloudSecureStorage {
 
   @override
   Future<void> deleteUserId() async => _delete(_keyUserId);
+
+  @override
+  Future<void> writeCloudUsername(String value) async =>
+      _write(_keyCloudUsername, value);
+
+  @override
+  Future<String?> readCloudUsername() async => _read(_keyCloudUsername);
+
+  @override
+  Future<void> deleteCloudUsername() async => _delete(_keyCloudUsername);
 
   @override
   Future<void> clearAll() async {

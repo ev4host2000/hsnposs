@@ -39,9 +39,10 @@ class TransactionSyncConstants {
     'update',
     'post',
     'cancel',
+    'void',
   ];
 
   static const List<String> draftOperations = ['create', 'update'];
 
-  static const List<String> effectOperations = ['post', 'cancel'];
+  static const List<String> effectOperations = ['post', 'cancel', 'void'];
 }

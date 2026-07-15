@@ -60,14 +60,29 @@ trait SupplierPaymentDraftLww
         }
 
         $existing = $this->fetchSupplierPaymentRow($companyId, $entityId);
+        // Idempotent create: already on server → success (do not rewrite posted rows).
         if ($operation === 'create' && $existing !== null && ($existing['deleted_at'] ?? null) === null) {
-            throw new HttpException('conflict', 'Payment already exists', 409);
+            $status = (string) ($existing['payment_status'] ?? 'draft');
+            $linesForEnvelope = is_array($lines) ? $lines : [];
+
+            return $this->buildAggregateEnvelope(
+                $companyId,
+                $branchId,
+                $entityId,
+                $header,
+                $linesForEnvelope,
+                $metadata,
+                (int) ($existing['row_version'] ?? $clientRowVersion),
+                (int) ($existing['transaction_version'] ?? 0),
+                $status !== '' ? $status : 'draft',
+                $originDeviceId,
+            );
         }
         if ($operation === 'update') {
             if ($existing === null || ($existing['deleted_at'] ?? null) !== null) {
-                throw new HttpException('not_found', 'Draft payment not found', 404);
-            }
-            if (($existing['payment_status'] ?? '') !== 'draft') {
+                // تحديث لمسودة غير موجودة بعد — عاملها كإنشاء.
+                $operation = 'create';
+            } elseif (($existing['payment_status'] ?? '') !== 'draft') {
                 throw new HttpException('payment_not_editable', 'Only draft payments can be updated', 409);
             }
         }

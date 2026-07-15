@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Miza Cloud — لوحة العمليات</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="admin.css">
+  <link rel="stylesheet" href="miza-identity.css">
+  <link rel="stylesheet" href="miza-ux-polish.css">
+</head>
+<body>
+  <a class="skip-link" href="#main-content">تخطي إلى المحتوى</a>
+  <div id="app">
+    <section id="login-view" class="login-shell">
+      <div class="login-card card">
+        <div class="brand-mark" aria-hidden="true">M</div>
+        <h1>Miza Cloud Ops</h1>
+        <p class="muted">لوحة إدارة المنصة — للفريق الداخلي فقط</p>
+        <form id="login-form" novalidate>
+          <label class="field">
+            <span>البريد</span>
+            <input type="email" id="login-email" autocomplete="username" required placeholder="info@mizapos.com" aria-describedby="login-error">
+          </label>
+          <label class="field">
+            <span>كلمة المرور</span>
+            <input type="password" id="login-password" autocomplete="current-password" required aria-describedby="login-error">
+          </label>
+          <button type="submit" id="login-submit" class="btn btn-primary btn-block">دخول</button>
+          <p id="login-error" class="error hidden" role="alert"></p>
+        </form>
+      </div>
+    </section>
+
+    <section id="main-view" class="hidden app-shell">
+      <aside class="sidebar" aria-label="التنقل الرئيسي">
+        <div class="sidebar-brand">
+          <div class="brand-mark sm" aria-hidden="true">M</div>
+          <div>
+            <strong>Miza Ops</strong>
+            <span id="admin-email" class="muted"></span>
+          </div>
+        </div>
+        <nav class="sidebar-nav" aria-label="أقسام اللوحة">
+          <button class="nav-btn active" data-view="dashboard" type="button" aria-current="page">
+            <span class="nav-icon" aria-hidden="true">◉</span>
+            <span>لوحة التحكم</span>
+          </button>
+          <button class="nav-btn" data-view="companies" type="button">
+            <span class="nav-icon" aria-hidden="true">▣</span>
+            <span>المتاجر</span>
+          </button>
+          <button class="nav-btn" data-view="sync" type="button">
+            <span class="nav-icon" aria-hidden="true">↻</span>
+            <span>المزامنة</span>
+          </button>
+          <button class="nav-btn" data-view="monitoring" type="button">
+            <span class="nav-icon" aria-hidden="true">▣</span>
+            <span>المراقبة</span>
+          </button>
+          <button class="nav-btn" data-view="auditlog" type="button">
+            <span class="nav-icon" aria-hidden="true">☰</span>
+            <span>Audit Log</span>
+          </button>
+          <button class="nav-btn" data-view="observability" type="button">
+            <span class="nav-icon" aria-hidden="true">◎</span>
+            <span>النظام</span>
+          </button>
+        </nav>
+        <button id="logout-btn" class="btn btn-ghost btn-block sidebar-logout" type="button">خروج</button>
+      </aside>
+
+      <main id="main-content" class="main-area" tabindex="-1">
+        <section id="dashboard-view" class="view-panel dash-page">
+          <header class="dash-page-header">
+            <div class="dash-page-header-text">
+              <p class="eyebrow">مركز العمليات</p>
+              <h1>لوحة التحكم</h1>
+              <p class="dash-page-desc muted">نظرة فورية على صحة المنصة والطلبات والاشتراكات والمزامنة</p>
+            </div>
+            <div class="dash-page-header-actions">
+              <div class="dash-header-meta">
+                <p id="dash-status-line" class="dash-updated muted">جاري التحميل…</p>
+                <div id="dash-status-pill" class="status-pill healthy">سليم</div>
+              </div>
+              <button id="refresh-dashboard" class="btn btn-secondary dash-refresh-btn" type="button">
+                <span aria-hidden="true">↻</span>
+                تحديث
+              </button>
+            </div>
+          </header>
+
+          <div id="dash-mail-hint" class="hint-banner hidden"></div>
+
+          <section class="dash-section" aria-label="المؤشرات">
+            <div id="dash-metrics-cards" class="dash-kpi-grid"></div>
+          </section>
+
+          <section class="dash-main-grid" aria-label="حالة المنصة">
+            <article class="panel-card dash-panel">
+              <div class="panel-head">
+                <div>
+                  <h2>صحة النظام</h2>
+                  <p class="muted">مؤشرات الحالة الحرجة في لمحة</p>
+                </div>
+              </div>
+              <div id="dash-health-cards" class="dash-health-grid"></div>
+            </article>
+
+            <article class="panel-card dash-panel">
+              <div class="panel-head">
+                <div>
+                  <h2>النشاط والتنبيهات</h2>
+                  <p class="muted">آخر إشارات المنصة التي تحتاج متابعة</p>
+                </div>
+              </div>
+              <div id="dash-alerts" class="dash-timeline"></div>
+            </article>
+
+            <article class="panel-card dash-panel">
+              <div class="panel-head">
+                <div>
+                  <h2>ملخص سريع</h2>
+                  <p class="muted">أرقام تشغيلية مختصرة</p>
+                </div>
+              </div>
+              <div id="dash-quick-summary" class="dash-summary-grid"></div>
+            </article>
+          </section>
+
+          <section class="panel-card dash-panel dash-actions-panel" aria-label="إجراءات سريعة">
+            <div class="panel-head">
+              <div>
+                <h2>إجراءات سريعة</h2>
+                <p class="muted">إنشاء متجر يدوياً أو إصدار كود دعوة</p>
+              </div>
+            </div>
+            <div class="dash-actions-grid">
+              <form id="create-form" class="dash-action-card">
+                <div class="dash-action-card-head">
+                  <span class="dash-action-icon" aria-hidden="true">＋</span>
+                  <div>
+                    <h3>متجر جديد</h3>
+                    <p class="muted">إنشاء مستأجر مع بطاقة ترحيب</p>
+                  </div>
+                </div>
+                <label class="field compact">
+                  <span>اسم المتجر</span>
+                  <input type="text" id="create-store" required maxlength="120">
+                </label>
+                <label class="field compact">
+                  <span>بريد المالك</span>
+                  <input type="email" id="create-email" required>
+                </label>
+                <label class="field compact">
+                  <span>اسم المالك</span>
+                  <input type="text" id="create-owner" placeholder="اختياري">
+                </label>
+                <label class="field compact">
+                  <span>كلمة المرور</span>
+                  <input type="password" id="create-password" required minlength="8">
+                </label>
+                <label class="field compact">
+                  <span>الخطة</span>
+                  <select id="create-plan" required></select>
+                </label>
+                <button type="submit" class="btn btn-primary btn-block dash-action-submit">إنشاء المتجر</button>
+                <p id="create-error" class="error hidden" role="alert"></p>
+              </form>
+
+              <form id="voucher-form" class="dash-action-card">
+                <div class="dash-action-card-head">
+                  <span class="dash-action-icon dash-action-icon-info" aria-hidden="true">◇</span>
+                  <div>
+                    <h3>كود دعوة</h3>
+                    <p class="muted">إصدار كود تفعيل محدود الاستخدام</p>
+                  </div>
+                </div>
+                <label class="field compact">
+                  <span>الكود</span>
+                  <input type="text" id="voucher-code" required minlength="4" class="uppercase-input" placeholder="BETA2026" autocomplete="off">
+                </label>
+                <label class="field compact">
+                  <span>الخطة</span>
+                  <select id="voucher-plan" aria-label="خطة كود الدعوة"></select>
+                </label>
+                <label class="field compact">
+                  <span>عدد الاستخدامات</span>
+                  <input type="number" id="voucher-max-uses" value="1" min="1" max="1000">
+                </label>
+                <label class="field compact">
+                  <span>ملاحظات</span>
+                  <input type="text" id="voucher-notes" placeholder="اختياري">
+                </label>
+                <button type="submit" class="btn btn-primary btn-block dash-action-submit">إنشاء الكود</button>
+              </form>
+            </div>
+            <div id="create-result-wrap" class="welcome-result hidden">
+              <div class="welcome-result-head">
+                <strong>بطاقة ترحيب المتجر الجديد</strong>
+                <button id="copy-welcome" class="btn btn-ghost btn-sm" type="button">نسخ</button>
+              </div>
+              <pre id="create-result" class="result"></pre>
+            </div>
+          </section>
+
+          <section class="dash-tables-grid" aria-label="الجداول">
+            <article class="panel-card dash-panel" id="activation-section">
+              <div class="panel-head">
+                <div>
+                  <h2>التفعيل والانضمام</h2>
+                  <p class="muted">مراجعة طلبات Beta والموافقة أو الرفض مباشرة</p>
+                </div>
+                <span id="dash-pending-badge" class="count-badge">0</span>
+              </div>
+              <div class="table-wrap modern-table dash-table">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>المتجر</th>
+                      <th>البريد</th>
+                      <th>الخطة</th>
+                      <th>الكود</th>
+                      <th>التاريخ</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody id="dash-signups-tbody"></tbody>
+                </table>
+              </div>
+              <div id="signup-result-wrap" class="welcome-result hidden">
+                <div class="welcome-result-head">
+                  <strong>بطاقة الترحيب</strong>
+                  <button id="copy-signup-welcome" class="btn btn-ghost btn-sm" type="button">نسخ</button>
+                </div>
+                <pre id="signup-result" class="result"></pre>
+              </div>
+            </article>
+
+            <article class="panel-card dash-panel">
+              <div class="panel-head">
+                <div>
+                  <h2>أكواد الدعوة النشطة</h2>
+                  <p class="muted">آخر الأكواد المُنشأة</p>
+                </div>
+              </div>
+              <div class="table-wrap modern-table dash-table">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>الكود</th>
+                      <th>الخطة</th>
+                      <th>الاستخدام</th>
+                      <th>الحالة</th>
+                      <th>ينتهي</th>
+                    </tr>
+                  </thead>
+                  <tbody id="dash-vouchers-tbody"></tbody>
+                </table>
+              </div>
+            </article>
+          </section>
+        </section>
+
+        <section id="companies-view" class="view-panel hidden stores-page">
+          <header class="stores-page-header">
+            <div class="stores-page-header-text">
+              <p class="eyebrow">إدارة المنصة</p>
+              <h1>المتاجر</h1>
+              <p class="muted stores-page-desc">إدارة مستأجري المنصة والحالة والخطط والأجهزة</p>
+            </div>
+            <div class="stores-page-header-actions">
+              <span id="stores-count-badge" class="count-badge">0</span>
+              <button id="refresh-companies" class="btn btn-secondary" type="button">
+                <span aria-hidden="true">↻</span>
+                تحديث
+              </button>
+              <button id="stores-goto-create" class="btn btn-primary" type="button">
+                <span aria-hidden="true">＋</span>
+                متجر جديد
+              </button>
+            </div>
+          </header>
+
+          <div id="stores-summary" class="stores-summary" aria-label="ملخص المتاجر"></div>
+
+          <div class="stores-toolbar panel-card">
+            <div class="stores-toolbar-search">
+              <input type="search" id="company-search" class="search-input stores-search" placeholder="بحث: اسم المتجر، البريد، أو Company ID…" aria-label="بحث في المتاجر">
+            </div>
+            <div class="stores-toolbar-filters" id="stores-status-filters" role="group" aria-label="تصفية الحالة">
+              <button type="button" class="stores-filter-chip active" data-status-filter="all" aria-pressed="true">الكل</button>
+              <button type="button" class="stores-filter-chip" data-status-filter="active" aria-pressed="false">نشط</button>
+              <button type="button" class="stores-filter-chip" data-status-filter="suspended" aria-pressed="false">معلّق</button>
+              <button type="button" class="stores-filter-chip" data-status-filter="closed" aria-pressed="false">مغلق</button>
+            </div>
+            <div class="stores-toolbar-actions">
+              <button id="stores-toolbar-refresh" class="btn btn-ghost btn-sm" type="button">تحديث</button>
+            </div>
+          </div>
+
+          <div class="panel-card stores-table-card">
+            <div class="table-wrap modern-table stores-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>المتجر</th>
+                    <th>المالك</th>
+                    <th>الخطة</th>
+                    <th>الأجهزة</th>
+                    <th>الحالة</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="companies-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section id="company-detail-view" class="view-panel hidden store-command">
+          <div class="cc-topbar">
+            <button id="back-to-list" class="btn btn-ghost btn-sm cc-back" type="button">← العودة للمتاجر</button>
+            <button id="cc-refresh" class="btn btn-secondary btn-sm" type="button">
+              <span aria-hidden="true">↻</span>
+              تحديث
+            </button>
+          </div>
+          <div id="cc-header" class="cc-header"></div>
+          <div id="cc-summary-cards" class="cc-summary-cards"></div>
+
+          <div class="cc-layout">
+            <div class="cc-main">
+              <div id="company-summary" class="panel-card cc-panel"></div>
+              <div id="company-sync-health" class="panel-card cc-panel hidden"></div>
+
+              <section class="panel-card cc-panel">
+                <div class="panel-head">
+                  <div>
+                    <h2>الأجهزة المتصلة</h2>
+                    <p class="muted">أجهزة هذا المتجر وحالتها على السحابة</p>
+                  </div>
+                </div>
+                <div id="devices-tbody" class="cc-devices-grid"></div>
+              </section>
+            </div>
+
+            <aside class="cc-side">
+              <div id="cc-health" class="panel-card cc-panel"></div>
+              <div id="cc-activity" class="panel-card cc-panel"></div>
+              <div id="cc-warnings" class="panel-card cc-panel"></div>
+              <div id="cc-quick-actions" class="panel-card cc-panel"></div>
+            </aside>
+          </div>
+        </section>
+
+        <section id="sync-view" class="view-panel hidden">
+          <header class="page-header">
+            <div>
+              <p class="eyebrow">Sync</p>
+              <h1>مراقبة المزامنة</h1>
+              <p class="muted">الطوابير والأجهزة الغائبة والتعارضات</p>
+            </div>
+            <div class="header-actions">
+              <button id="refresh-sync" class="btn btn-ghost" type="button">تحديث</button>
+            </div>
+          </header>
+          <div id="sync-overview-cards" class="kpi-grid"></div>
+          <h2 class="section-title">أجهزة غائبة (+24 ساعة)</h2>
+          <div class="table-wrap modern-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>المتجر</th>
+                  <th>الجهاز</th>
+                  <th>المنصة</th>
+                  <th>آخر ظهور</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="stale-devices-tbody"></tbody>
+            </table>
+          </div>
+          <h2 class="section-title">أخطاء المزامنة</h2>
+          <div class="table-wrap modern-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>المتجر</th>
+                  <th>الكيان</th>
+                  <th>الحالة</th>
+                  <th>الخطأ</th>
+                  <th>الوقت</th>
+                </tr>
+              </thead>
+              <tbody id="sync-failures-tbody"></tbody>
+            </table>
+          </div>
+          <h2 class="section-title">تعارضات معلّقة</h2>
+          <div class="table-wrap modern-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>المتجر</th>
+                  <th>الكيان</th>
+                  <th>النوع</th>
+                  <th>الحالة</th>
+                  <th>الوقت</th>
+                </tr>
+              </thead>
+              <tbody id="sync-conflicts-tbody"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="monitoring-view" class="view-panel hidden mon-page">
+          <header class="dash-page-header">
+            <div class="dash-page-header-text">
+              <p class="eyebrow">Live Ops</p>
+              <h1>مراقبة Miza Cloud</h1>
+              <p class="dash-page-desc muted">حالة النظام لحظياً لاكتشاف المشاكل قبل بلاغات العملاء</p>
+            </div>
+            <div class="dash-page-header-actions">
+              <label class="mon-auto-refresh">
+                <input type="checkbox" id="mon-auto-refresh" checked>
+                <span>تحديث كل 10 ثوانٍ</span>
+              </label>
+              <p id="mon-updated" class="dash-updated muted">—</p>
+              <button id="refresh-monitoring" class="btn btn-secondary dash-refresh-btn" type="button">
+                <span aria-hidden="true">↻</span>
+                Refresh Now
+              </button>
+            </div>
+          </header>
+
+          <div id="mon-alert-banner" class="mon-alert-banner hidden" role="alert"></div>
+
+          <section class="panel-card dash-panel mon-filters" aria-label="Filters">
+            <div class="panel-head">
+              <div>
+                <h2>تصفية</h2>
+                <p class="muted">Organization · Branch · Device · Date · Sync Type · Status</p>
+              </div>
+            </div>
+            <form id="mon-filter-form" class="mon-filter-grid">
+              <label class="field compact"><span>Organization</span><input id="mon-filter-org" type="search" placeholder="Company UUID"></label>
+              <label class="field compact"><span>Branch</span><input id="mon-filter-branch" type="search" placeholder="Branch UUID"></label>
+              <label class="field compact"><span>Device</span><input id="mon-filter-device" type="search" placeholder="Device UUID"></label>
+              <label class="field compact"><span>Date From</span><input id="mon-filter-from" type="date"></label>
+              <label class="field compact"><span>Date To</span><input id="mon-filter-to" type="date"></label>
+              <label class="field compact"><span>Sync Type</span><input id="mon-filter-type" type="search" placeholder="entity_type"></label>
+              <label class="field compact"><span>Status</span>
+                <select id="mon-filter-status">
+                  <option value="">الكل</option>
+                  <option value="pending">pending</option>
+                  <option value="accepted">accepted</option>
+                  <option value="rejected">rejected</option>
+                  <option value="conflict">conflict</option>
+                  <option value="processing">processing</option>
+                </select>
+              </label>
+              <div class="mon-filter-actions">
+                <button type="submit" class="btn btn-primary">تطبيق</button>
+                <button type="button" id="mon-filter-reset" class="btn btn-ghost">إعادة تعيين</button>
+              </div>
+            </form>
+          </section>
+
+          <section class="dash-section" aria-label="System Health">
+            <h2 class="section-title">System Health</h2>
+            <div id="mon-health-cards" class="dash-kpi-grid"></div>
+          </section>
+
+          <section class="dash-section" aria-label="Synchronization">
+            <h2 class="section-title">Synchronization</h2>
+            <div id="mon-sync-cards" class="dash-kpi-grid"></div>
+          </section>
+
+          <section class="dash-section" aria-label="Outbox">
+            <h2 class="section-title">Outbox</h2>
+            <div id="mon-outbox-cards" class="dash-kpi-grid"></div>
+          </section>
+
+          <section class="dash-section" aria-label="Errors">
+            <h2 class="section-title">Errors</h2>
+            <div id="mon-error-cards" class="dash-kpi-grid"></div>
+          </section>
+
+          <section class="dash-section" aria-label="Performance">
+            <h2 class="section-title">Performance</h2>
+            <div id="mon-perf-cards" class="dash-kpi-grid"></div>
+          </section>
+
+          <section class="dash-section" aria-label="Security">
+            <h2 class="section-title">Security</h2>
+            <div id="mon-security-cards" class="dash-kpi-grid"></div>
+          </section>
+
+          <section class="panel-card dash-panel" aria-label="Charts">
+            <div class="panel-head">
+              <div>
+                <h2>Charts</h2>
+                <p class="muted">معدلات النجاح والفشل والزمن والطابور</p>
+              </div>
+            </div>
+            <div id="mon-charts" class="mon-charts-grid"></div>
+          </section>
+
+          <section class="panel-card dash-panel" aria-label="Organizations">
+            <div class="panel-head">
+              <div>
+                <h2>Organizations</h2>
+                <p class="muted">حالة كل مؤسسة</p>
+              </div>
+            </div>
+            <div class="table-wrap modern-table dash-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Organization</th>
+                    <th>Last Sync</th>
+                    <th>Online</th>
+                    <th>Offline</th>
+                    <th>Failed Sync</th>
+                    <th>Pending Outbox</th>
+                    <th>Avg Sync</th>
+                    <th>Subscription</th>
+                  </tr>
+                </thead>
+                <tbody id="mon-orgs-tbody"></tbody>
+              </table>
+            </div>
+          </section>
+        </section>
+
+        <section id="auditlog-view" class="view-panel hidden audit-page">
+          <header class="dash-page-header">
+            <div class="dash-page-header-text">
+              <p class="eyebrow">Security · Immutable</p>
+              <h1>Audit Log</h1>
+              <p class="dash-page-desc muted">تتبع العمليات الحساسة — من قام بها ومتى والنتيجة</p>
+            </div>
+            <div class="dash-page-header-actions">
+              <p id="auditlog-meta" class="dash-updated muted">—</p>
+              <div class="audit-export-group">
+                <button type="button" class="btn btn-ghost" data-audit-export="csv">CSV</button>
+                <button type="button" class="btn btn-ghost" data-audit-export="excel">Excel</button>
+                <button type="button" class="btn btn-ghost" data-audit-export="json">JSON</button>
+                <button type="button" class="btn btn-ghost" data-audit-export="pdf">PDF</button>
+              </div>
+              <button id="refresh-auditlog" class="btn btn-secondary dash-refresh-btn" type="button">
+                <span aria-hidden="true">↻</span>
+                تحديث
+              </button>
+            </div>
+          </header>
+
+          <div id="auditlog-alert-banner" class="mon-alert-banner hidden" role="alert"></div>
+
+          <section class="panel-card dash-panel mon-filters" aria-label="Audit Filters">
+            <div class="panel-head">
+              <div>
+                <h2>تصفية وبحث</h2>
+                <p class="muted">Date · Organization · Branch · User · Device · Entity · Action · Status · Severity · Error</p>
+              </div>
+            </div>
+            <form id="auditlog-filter-form" class="mon-filter-grid">
+              <label class="field compact"><span>Search</span><input id="auditlog-q" type="search" placeholder="action / user / reason"></label>
+              <label class="field compact"><span>Date From</span><input id="auditlog-from" type="date"></label>
+              <label class="field compact"><span>Date To</span><input id="auditlog-to" type="date"></label>
+              <label class="field compact"><span>Organization</span><input id="auditlog-org" type="search" placeholder="Company UUID"></label>
+              <label class="field compact"><span>Branch</span><input id="auditlog-branch" type="search" placeholder="Branch UUID"></label>
+              <label class="field compact"><span>User</span><input id="auditlog-user" type="search" placeholder="User UUID"></label>
+              <label class="field compact"><span>Device</span><input id="auditlog-device" type="search" placeholder="Device UUID"></label>
+              <label class="field compact"><span>Entity</span><input id="auditlog-entity" type="search" placeholder="entity"></label>
+              <label class="field compact"><span>Action</span><input id="auditlog-action" type="search" placeholder="auth.login"></label>
+              <label class="field compact"><span>Status</span>
+                <select id="auditlog-status">
+                  <option value="">الكل</option>
+                  <option value="success">success</option>
+                  <option value="failure">failure</option>
+                  <option value="partial">partial</option>
+                </select>
+              </label>
+              <label class="field compact"><span>Severity</span>
+                <select id="auditlog-severity">
+                  <option value="">الكل</option>
+                  <option value="info">info</option>
+                  <option value="warning">warning</option>
+                  <option value="error">error</option>
+                  <option value="critical">critical</option>
+                </select>
+              </label>
+              <label class="field compact"><span>Error Code</span><input id="auditlog-error" type="search" placeholder="error_code"></label>
+              <div class="mon-filter-actions">
+                <button type="submit" class="btn btn-primary">تطبيق</button>
+                <button type="button" id="auditlog-filter-reset" class="btn btn-ghost">إعادة تعيين</button>
+              </div>
+            </form>
+          </section>
+
+          <section class="panel-card dash-panel" aria-label="Retention">
+            <div class="panel-head">
+              <div>
+                <h2>Retention</h2>
+                <p class="muted">سياسة الاحتفاظ ثم الأرشفة — لا حذف من الواجهة</p>
+              </div>
+              <div class="header-actions">
+                <select id="auditlog-retention-days" class="search-input" aria-label="Retention days">
+                  <option value="90">90 يوم</option>
+                  <option value="180">180 يوم</option>
+                  <option value="365">365 يوم</option>
+                </select>
+                <button type="button" id="auditlog-retention-save" class="btn btn-ghost">حفظ</button>
+                <button type="button" id="auditlog-retention-run" class="btn btn-secondary">تشغيل الأرشفة</button>
+              </div>
+            </div>
+            <p id="auditlog-retention-meta" class="muted">—</p>
+          </section>
+
+          <section class="panel-card dash-panel" aria-label="Audit Events">
+            <div class="panel-head">
+              <div>
+                <h2>الأحداث</h2>
+                <p class="muted">اضغط على صف لعرض التفاصيل · السجل غير قابل للتعديل</p>
+              </div>
+              <div class="header-actions">
+                <label class="field compact" style="min-width:140px">
+                  <span>ترتيب</span>
+                  <select id="auditlog-sort">
+                    <option value="created_at:desc">الأحدث</option>
+                    <option value="created_at:asc">الأقدم</option>
+                    <option value="action:asc">Action A-Z</option>
+                    <option value="severity:desc">Severity</option>
+                    <option value="status:asc">Status</option>
+                  </select>
+                </label>
+              </div>
+            </div>
+            <div class="table-wrap modern-table dash-table audit-virtual-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>الوقت (UTC)</th>
+                    <th>Action</th>
+                    <th>Status</th>
+                    <th>Severity</th>
+                    <th>Organization</th>
+                    <th>User</th>
+                    <th>Entity</th>
+                    <th>IP</th>
+                  </tr>
+                </thead>
+                <tbody id="auditlog-tbody"></tbody>
+              </table>
+            </div>
+            <div class="audit-pager">
+              <button type="button" id="auditlog-prev" class="btn btn-ghost" disabled>السابق</button>
+              <span id="auditlog-page-label" class="muted">—</span>
+              <button type="button" id="auditlog-next" class="btn btn-ghost" disabled>التالي</button>
+            </div>
+          </section>
+        </section>
+
+        <section id="observability-view" class="view-panel hidden">
+          <header class="page-header">
+            <div>
+              <p class="eyebrow">Observability</p>
+              <h1>مراقبة النظام</h1>
+              <p class="muted">البنية التحتية وسجلات التدقيق</p>
+            </div>
+            <div class="header-actions">
+              <button id="refresh-observability" class="btn btn-ghost" type="button">تحديث</button>
+            </div>
+          </header>
+          <div id="obs-status-banner" class="status-pill wide healthy">سليم</div>
+          <div id="obs-metrics-cards" class="kpi-grid"></div>
+          <h2 class="section-title">تنبيهات</h2>
+          <div id="obs-alerts" class="alerts-stack"></div>
+          <h2 class="section-title">البنية التحتية</h2>
+          <div id="obs-infra" class="panel-card infra-grid"></div>
+          <h2 class="section-title">سجل التدقيق</h2>
+          <div class="header-actions filter-row">
+            <input type="search" id="audit-company-id" class="search-input" placeholder="Company ID" aria-label="تصفية حسب Company ID">
+            <input type="search" id="audit-action" class="search-input" placeholder="فلتر action" aria-label="تصفية حسب الإجراء">
+            <button id="load-audit" class="btn btn-ghost" type="button">تحميل</button>
+          </div>
+          <div class="table-wrap modern-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>الوقت</th>
+                  <th>المتجر</th>
+                  <th>الإجراء</th>
+                  <th>الكيان</th>
+                  <th>IP</th>
+                </tr>
+              </thead>
+              <tbody id="audit-tbody"></tbody>
+            </table>
+          </div>
+          <p id="audit-meta" class="muted"></p>
+        </section>
+      </main>
+    </section>
+  </div>
+
+  <div id="modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal-backdrop" data-close-modal></div>
+    <div class="modal-card card">
+      <div class="modal-head">
+        <h3 id="modal-title">تأكيد</h3>
+        <button type="button" class="btn btn-ghost btn-sm" data-close-modal aria-label="إغلاق">✕</button>
+      </div>
+      <div id="modal-body" class="modal-body"></div>
+      <div id="modal-actions" class="modal-actions"></div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast toast-info hidden" role="status" aria-live="polite" aria-atomic="true"></div>
+  <script src="admin.js"></script>
+</body>
+</html>

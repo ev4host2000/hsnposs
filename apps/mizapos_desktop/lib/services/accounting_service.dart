@@ -12,19 +12,40 @@ import 'package:mizapos_desktop/security/password_crypto.dart';
 import 'package:mizapos_desktop/security/security_preferences.dart';
 import 'package:mizapos_desktop/services/activation_api_contract.dart';
 import 'package:mizapos_desktop/services/admin_broadcast_notice.dart';
+import 'package:mizapos_desktop/services/cloud/core/cloud_runtime.dart';
 import 'package:mizapos_desktop/services/cloud/storage/cloud_secure_storage_placeholder.dart';
+import 'package:mizapos_desktop/services/cloud/sync/cash_sync_constants.dart';
+import 'package:mizapos_desktop/services/cloud/sync/catalog_sync_constants.dart';
+import 'package:mizapos_desktop/services/cloud/sync/catalog_sync_outbox_writer.dart';
+import 'package:mizapos_desktop/services/cloud/sync/expense_sync_constants.dart';
+import 'package:mizapos_desktop/services/cloud/sync/partner_sync_outbox_writer.dart';
+import 'package:mizapos_desktop/services/cloud/sync/product_category_sync_outbox_writer.dart';
+import 'package:mizapos_desktop/services/cloud/sync/product_unit_sync_outbox_writer.dart';
+import 'package:mizapos_desktop/services/cloud/sync/tax_sync_outbox_writer.dart';
+import 'package:mizapos_desktop/services/cloud/sync/price_list_sync_outbox_writer.dart';
+import 'package:mizapos_desktop/services/cloud/sync/partners_sync_constants.dart';
+import 'package:mizapos_desktop/services/cloud/sync/product_sync_outbox_writer.dart';
 import 'package:mizapos_desktop/services/cloud/sync/transaction_inventory_adjustment_sync_service.dart';
+import 'package:mizapos_desktop/services/cloud/sync/posting/sales_invoice/sales_invoice_post_ids.dart';
+import 'package:mizapos_desktop/services/cloud/sync/posting/purchase_invoice/purchase_invoice_post_ids.dart';
+import 'package:mizapos_desktop/services/cloud/sync/transaction_invoice_sync_service.dart';
+import 'package:mizapos_desktop/services/cloud/sync/transaction_invoice_void_outbox.dart';
 import 'package:mizapos_desktop/services/cloud/sync/transaction_opening_stock_sync_service.dart';
+import 'package:mizapos_desktop/services/cloud/sync/transaction_payment_sync_service.dart';
+import 'package:mizapos_desktop/services/cloud/sync/transaction_return_sync_service.dart';
 import 'package:mizapos_desktop/services/cloud/sync/transaction_sync_outbox_writer.dart';
 import 'package:mizapos_desktop/services/database_service.dart';
 import 'package:mizapos_desktop/services/operational_scope_resolver.dart';
+import 'package:mizapos_desktop/services/product_image_storage.dart';
 import 'package:mizapos_desktop/services/database_startup_diagnostics.dart';
 import 'package:mizapos_desktop/services/device_binding.dart';
 import 'package:mizapos_desktop/services/app_local_data_wiper.dart';
 import 'package:mizapos_desktop/services/license_gate.dart';
+import 'package:mizapos_desktop/services/pos_subscription_phase.dart';
 import 'package:mizapos_desktop/services/remote_signup_api.dart';
 import 'package:mizapos_desktop/services/team_users_api.dart';
 import 'package:mizapos_desktop/services/team_users_sync_service.dart';
+import 'package:mizapos_desktop/config/subscription_voucher_config.dart';
 import 'package:mizapos_desktop/services/voucher_session_manager.dart';
 import 'package:mizapos_desktop/services/voucher_session_store.dart';
 import 'package:mizapos_desktop/utils/app_data_paths.dart';
@@ -32,7 +53,7 @@ import 'package:mizapos_desktop/utils/debug_session_log.dart';
 import 'package:mizapos_desktop/utils/device_link_code.dart';
 import 'package:mizapos_desktop/utils/invoice_display_number.dart';
 import 'package:mizapos_desktop/services/smtp_activation_mailer.dart';
-import 'package:flutter/foundation.dart' show VoidCallback, debugPrint;
+import 'package:flutter/foundation.dart' show VoidCallback, debugPrint, kDebugMode;
 import 'package:intl/intl.dart';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
@@ -67,6 +88,36 @@ class AccountingService {
     return DatabaseStartupDiagnostics.log(
       databaseService: _databaseService,
       accountingService: this,
+    );
+  }
+
+  /// يحدّث جلسة المستخدم المحلية لتطابق مستأجر Miza Cloud بعد الربط.
+  Future<void> applyCloudTenantScope({
+    required String organizationId,
+    required String branchId,
+  }) async {
+    final s = _session;
+    if (s == null) return;
+    final org = organizationId.trim();
+    final branch = branchId.trim();
+    if (org.isEmpty || branch.isEmpty) return;
+
+    final db = await _databaseService.database;
+    await db.update(
+      'users',
+      {
+        'organizationId': org,
+        'branchId': branch,
+      },
+      where: 'id = ?',
+      whereArgs: [s.userId],
+    );
+    _session = AppUserSession(
+      organizationId: org,
+      branchId: branch,
+      userId: s.userId,
+      role: s.role,
+      username: s.username,
     );
   }
 
@@ -276,6 +327,90 @@ class AccountingService {
   }
 
   bool _subscriptionBindingMismatch = false;
+  bool _emailDeviceAccessDenied = false;
+  String? _emailDeviceLimitError;
+  String? _remoteSubscriptionPlanType;
+  bool _remoteSubscriptionExpired = false;
+  bool _remoteTrialActive = false;
+  String? _lastPullCanonicalOrganizationId;
+  int? _remoteTrialDaysRemaining;
+  DateTime? _remoteTrialEndAt;
+  DateTime? _remoteAnnualEndAt;
+  int? _remoteSubscriptionDaysRemaining;
+  PosSubscriptionPhase? _remotePosPhase;
+  DateTime? _remoteOfficialUntil;
+  bool _remoteLegacyActivated = false;
+
+  /// نوع خطة الاشتراك من آخر سحب ترخيص (`trial` / `annual` / `custom` / null).
+  String? get remoteSubscriptionPlanType => _remoteSubscriptionPlanType;
+
+  bool get subscriptionIsTrial {
+    if (_remotePosPhase == PosSubscriptionPhase.emailTrial) return true;
+    if (_remotePosPhase == PosSubscriptionPhase.official ||
+        _remotePosPhase == PosSubscriptionPhase.suspended ||
+        _remotePosPhase == PosSubscriptionPhase.expired ||
+        _remotePosPhase == PosSubscriptionPhase.none) {
+      return false;
+    }
+    return (_remoteSubscriptionPlanType ?? '').trim().toLowerCase() == 'trial';
+  }
+
+  bool get remoteEmailTrialActive => _remoteTrialActive;
+
+  int? get remoteTrialDaysRemaining => _remoteTrialDaysRemaining;
+
+  DateTime? get remoteTrialEndAt => _remoteTrialEndAt;
+
+  DateTime? get remoteAnnualEndAt => _remoteAnnualEndAt;
+
+  int? get remoteSubscriptionDaysRemaining => _remoteSubscriptionDaysRemaining;
+
+  PosSubscriptionPhase? get posPhase => _remotePosPhase;
+
+  DateTime? get remoteOfficialUntil => _remoteOfficialUntil;
+
+  bool get remoteLegacyActivated => _remoteLegacyActivated;
+
+  bool hasActiveEmailTrialCoverage(DateTime now) {
+    if (_remotePosPhase == PosSubscriptionPhase.emailTrial) return true;
+    if (_remotePosPhase == PosSubscriptionPhase.official ||
+        _remotePosPhase == PosSubscriptionPhase.suspended ||
+        _remotePosPhase == PosSubscriptionPhase.expired ||
+        _remotePosPhase == PosSubscriptionPhase.none) {
+      return false;
+    }
+    return licenseGate.hasActiveEmailTrial(now) || _remoteTrialActive;
+  }
+
+  bool hasActiveAnnualSubscriptionCoverage(DateTime now) {
+    if (_remotePosPhase == PosSubscriptionPhase.official) return true;
+    if (_remotePosPhase == PosSubscriptionPhase.emailTrial ||
+        _remotePosPhase == PosSubscriptionPhase.suspended ||
+        _remotePosPhase == PosSubscriptionPhase.expired ||
+        _remotePosPhase == PosSubscriptionPhase.none) {
+      return false;
+    }
+    if (licenseGate.coverageKind(now) == LicenseCoverageKind.annual) {
+      return true;
+    }
+    if (_remoteSubscriptionExpired) return false;
+    if (AccountingService.isSubscriptionEndDateActive(now, _remoteAnnualEndAt)) {
+      return true;
+    }
+    if (_remoteTrialActive || subscriptionIsTrial) return false;
+    return (_remoteSubscriptionDaysRemaining ?? 0) > 0 &&
+        _remoteAnnualEndAt != null;
+  }
+
+  /// هل السحب الأخير يشير إلى تجربة بريد وليس اشتراكاً سنوياً؟
+  bool _remoteIndicatesEmailTrial() {
+    if (_remotePosPhase == PosSubscriptionPhase.emailTrial) return true;
+    if (_remotePosPhase == PosSubscriptionPhase.official) return false;
+    if (_remoteTrialActive) return true;
+    return subscriptionIsTrial;
+  }
+
+  bool get remoteSubscriptionExpired => _remoteSubscriptionExpired;
   AdminBroadcastNotice? _pendingAdminBroadcastNotice;
   final List<VoidCallback> _adminBroadcastListeners = [];
 
@@ -308,6 +443,10 @@ class AccountingService {
 
   /// آخر مزامنة ترخيص اكتشفت اشتراكاً مسجَّلاً لجهاز/حساب آخر.
   bool get subscriptionBindingMismatch => _subscriptionBindingMismatch;
+
+  bool get emailDeviceAccessDenied => _emailDeviceAccessDenied;
+
+  String? get emailDeviceLimitError => _emailDeviceLimitError;
 
   /// إشعار جماعي من لوحة التفعيل (يُحدَّث عند [syncLicenseGate] أو [refreshAdminBroadcastNotice]).
   AdminBroadcastNotice? get pendingAdminBroadcastNotice =>
@@ -532,12 +671,15 @@ class AccountingService {
     if (orgId.isEmpty) return false;
 
     final voucherActive = _voucherSubscriptionActiveOnDevice;
+    final hasSubscriberSession = VoucherSessionManager.instance.hasSession;
     final offline = await VoucherSessionStore().readOfflineCredentials();
     final offlineEmail = (offline['email'] ?? '').trim().toLowerCase();
     final offlineHash = (offline['pwdHash'] ?? '').trim();
     final hasOfflineCreds =
         offlineEmail.contains('@') && PasswordCrypto.looksLikeBcrypt(offlineHash);
-    if (!voucherActive && !hasOfflineCreds) return false;
+    if (!voucherActive && !hasOfflineCreds && !hasSubscriberSession) {
+      return false;
+    }
 
     String? email;
     var fullName = '';
@@ -632,7 +774,7 @@ class AccountingService {
 
     final anyOwner = await db.rawQuery(
       '''
-      SELECT id FROM users
+      SELECT id, email, username FROM users
       WHERE organizationId = ?
         AND lower(trim(role)) = 'owner'
         AND COALESCE(accountStatus, 'active') = 'active'
@@ -640,7 +782,33 @@ class AccountingService {
       ''',
       [orgId],
     );
-    if (anyOwner.isNotEmpty) return true;
+    if (anyOwner.isNotEmpty) {
+      // حدّث المالك المحلي ليطابق بريد جلسة حسابي (مثلاً بعد حذف حساب قديم من الويب).
+      final ownerId = anyOwner.first['id'] as String;
+      final ownerEmail = normalizeSubscriptionIdentity(
+        anyOwner.first['email'] as String?,
+        (anyOwner.first['username'] as String?) ?? '',
+      );
+      if (ownerEmail != email) {
+        final patch = <String, Object?>{
+          'email': email,
+          'username': email,
+          'fullName': fullName.isNotEmpty ? fullName : email,
+          'phone': phone,
+          'dialCode': dialCode,
+        };
+        if (PasswordCrypto.looksLikeBcrypt(hash)) {
+          patch['password'] = hash;
+        }
+        await db.update(
+          'users',
+          patch,
+          where: 'id = ?',
+          whereArgs: [ownerId],
+        );
+      }
+      return true;
+    }
 
     if (!PasswordCrypto.looksLikeBcrypt(hash)) return false;
 
@@ -781,12 +949,15 @@ class AccountingService {
           VoucherSessionManager.instance.session?.email.trim().toLowerCase() ??
           '';
 
+      AppUserSession? staffSession;
       if (password != null && password.isNotEmpty && em.contains('@')) {
-        final sess = await login(em, password);
-        if (sess != null) return true;
+        staffSession = await login(em, password);
       }
 
-      await enterSubscriptionOwnerSession(preferredEmail: em);
+      if (staffSession == null) {
+        await enterSubscriptionOwnerSession(preferredEmail: em);
+      }
+
       if (!isGuestSession) {
         await reconcileSessionOperationalScope();
         await syncLicenseGate();
@@ -1465,8 +1636,17 @@ class AccountingService {
         localOrganizationId?.trim() ?? _session?.organizationId.trim() ?? '';
     final db = await _databaseService.database;
 
+    // جلسة المشترك النشطة = مصدر الحقيقة (حتى لو بقي مالك محلي قديم ببريد آخر).
+    final liveSessionEmail = VoucherSessionManager
+            .instance.sessionNotifier.value?.email
+            .trim()
+            .toLowerCase() ??
+        '';
+    if (_isRealSubscriptionEmail(liveSessionEmail)) {
+      return liveSessionEmail;
+    }
+
     for (final raw in <String?>[
-      VoucherSessionManager.instance.sessionNotifier.value?.email,
       VoucherSessionManager.instance.statusNotifier.value.email,
     ]) {
       final e = (raw ?? '').trim().toLowerCase();
@@ -1583,13 +1763,30 @@ class AccountingService {
     if (vSess != null &&
         vSess.email.trim().toLowerCase() == em &&
         vSess.organizationId.trim().isNotEmpty) {
-      return vSess.organizationId.trim();
+      final voucherOrg = vSess.organizationId.trim();
+      // Tenant isolation: never return a foreign org even from voucher session.
+      if (voucherOrg == localOrg) return voucherOrg;
+      if (kDebugMode) {
+        debugPrint(
+          'tenant_isolation_org_mismatch cloudOrganizationIdForSubscriptionEmail '
+          'local=$localOrg voucher=$voucherOrg',
+        );
+      }
+      return null;
     }
 
     final vStatus = VoucherSessionManager.instance.statusNotifier.value;
     if (vStatus.email.trim().toLowerCase() == em &&
         vStatus.organizationId.trim().isNotEmpty) {
-      return vStatus.organizationId.trim();
+      final statusOrg = vStatus.organizationId.trim();
+      if (statusOrg == localOrg) return statusOrg;
+      if (kDebugMode) {
+        debugPrint(
+          'tenant_isolation_org_mismatch cloudOrganizationIdForSubscriptionEmail_status '
+          'local=$localOrg status=$statusOrg',
+        );
+      }
+      return null;
     }
 
     final scopedSignup = await db.rawQuery(
@@ -1603,10 +1800,36 @@ class AccountingService {
     );
     if (scopedSignup.isNotEmpty) {
       final oid = (scopedSignup.first['organizationId'] as String?)?.trim() ?? '';
-      if (oid.isNotEmpty) return oid;
+      if (oid.isNotEmpty && oid == localOrg) return oid;
     }
 
+    // Fail closed: never probe signup_requests by email alone across tenants.
     return localOrg;
+  }
+
+  Future<List<String>> _candidatePullOrganizationIds(
+    Database db,
+    AppUserSession s,
+    String email,
+  ) async {
+    final em = email.trim().toLowerCase();
+    final localOrg = s.organizationId.trim();
+    final out = <String>[];
+    if (localOrg.isEmpty) return out;
+
+    // Tenant isolation: only pull for the current local organization.
+    out.add(localOrg);
+
+    final remote = (await remoteApiSubscriptionOrganizationId())?.trim() ?? '';
+    if (remote.isNotEmpty && remote != localOrg) {
+      if (kDebugMode) {
+        debugPrint(
+          'tenant_isolation_org_mismatch _candidatePullOrganizationIds '
+          'local=$localOrg remote=$remote email=$em',
+        );
+      }
+    }
+    return out;
   }
 
   Future<({String organizationId, String email})?>
@@ -1638,12 +1861,8 @@ class AccountingService {
             .trim()
             .toLowerCase() ??
             '';
-    if (_isRealSubscriptionEmail(voucherEmail) &&
-        await localOrgBelongsToSubscriptionEmail(
-          db,
-          organizationId,
-          voucherEmail,
-        )) {
+    // بريد جلسة المشترك الحالي يُعتمد مباشرة دون انتظار ربط محلي قديم.
+    if (_isRealSubscriptionEmail(voucherEmail)) {
       return voucherEmail;
     }
 
@@ -1874,29 +2093,64 @@ class AccountingService {
     String organizationId,
     Map<String, Object?> subscriptionIdentityRow,
   ) async {
-    final canonical =
-        await resolveCanonicalSubscriptionEmailForOrg(db, organizationId);
-    if (canonical != null && _isRealSubscriptionEmail(canonical)) {
-      return canonical;
+    final candidates = await _candidateLicensePullEmails(
+      db,
+      organizationId,
+      subscriptionIdentityRow,
+    );
+    return candidates.isEmpty ? null : candidates.first;
+  }
+
+  /// مرشّحو البريد لـ [license-pull]: جلسة المشترك/السحابة أولاً ثم المالك المحلي.
+  Future<List<String>> _candidateLicensePullEmails(
+    Database db,
+    String organizationId,
+    Map<String, Object?> subscriptionIdentityRow,
+  ) async {
+    final seen = <String>{};
+    final out = <String>[];
+
+    void add(String? raw) {
+      final e = (raw ?? '').trim().toLowerCase();
+      if (!_isRealSubscriptionEmail(e) || seen.contains(e)) return;
+      seen.add(e);
+      out.add(e);
     }
 
-    var id = AccountingService.normalizeSubscriptionIdentity(
-      subscriptionIdentityRow['email'] as String?,
-      (subscriptionIdentityRow['username'] as String?) ?? '',
+    final vSess = VoucherSessionManager.instance.sessionNotifier.value;
+    add(vSess?.email);
+    add(VoucherSessionManager.instance.statusNotifier.value.email);
+    add(await _cloudSessionSubscriptionEmail());
+
+    final tenant = await activeSubscriptionEmailForSync(
+      localOrganizationId: organizationId,
     );
-    if (_isRealSubscriptionEmail(id)) return id;
+    add(tenant);
+
+    final canonical =
+        await resolveCanonicalSubscriptionEmailForOrg(db, organizationId);
+    add(canonical);
+
+    add(
+      AccountingService.normalizeSubscriptionIdentity(
+        subscriptionIdentityRow['email'] as String?,
+        (subscriptionIdentityRow['username'] as String?) ?? '',
+      ),
+    );
 
     final su = await db.query(
       'signup_requests',
       columns: ['email'],
       where: 'organizationId = ?',
       whereArgs: [organizationId],
-      orderBy: 'createdAt DESC',
-      limit: 1,
+      orderBy: 'COALESCE(reviewedAt, requestedAt) DESC',
+      limit: 5,
     );
-    if (su.isEmpty) return null;
-    final em = (su.first['email'] as String?)?.trim().toLowerCase() ?? '';
-    return _isRealSubscriptionEmail(em) ? em : null;
+    for (final row in su) {
+      add(row['email'] as String?);
+    }
+
+    return out;
   }
 
   Future<String> currentUserDisplayName() async {
@@ -2044,6 +2298,20 @@ class AccountingService {
     );
   }
 
+  /// بريد تسجيل الدخول السحابي (ميزا كلاود) — مفيد عندما لا تُحلّ هوية الترخيص محلياً.
+  Future<String?> _cloudSessionSubscriptionEmail() async {
+    try {
+      final runtime = CloudRuntime.instance;
+      if (runtime == null) return null;
+      final raw = (await runtime.storage.readCloudUsername())?.trim() ?? '';
+      final email = raw.toLowerCase();
+      if (_isRealSubscriptionEmail(email)) return email;
+    } on Object {
+      // ignore
+    }
+    return null;
+  }
+
   /// بريد الاشتراك لاستدعاءات API الخادم (طلبات ميدان، مزامنة ترخيص…).
   ///
   /// يطابق بريد القسيمة/التفعيل — وليس بريد موظف أو موزّع عشوائي.
@@ -2087,55 +2355,70 @@ class AccountingService {
 
   /// معرّف المؤسسة على خادم الاشتراك (من القسيمة/التسجيل).
   ///
-  /// على جهاز ثانٍ قد يختلف عن [AppUserSession.organizationId] المحلي
-  /// الذي تُخزَّن تحته بيانات SQLite — لكنه مطلوب لطلبات API السحابية.
+  /// Tenant isolation: always scoped to the current local session organization.
   Future<String?> remoteApiSubscriptionOrganizationId() async {
     final s = _session;
+    final localOrg = s?.organizationId.trim() ?? '';
     if (s != null) {
       final scoped = await resolveSubscriptionApiCredentialsForOrganization(
         s.organizationId,
       );
-      if (scoped != null) return scoped.organizationId;
+      if (scoped != null) {
+        final cloudOrg = scoped.organizationId.trim();
+        if (cloudOrg == localOrg) return cloudOrg;
+        if (kDebugMode) {
+          debugPrint(
+            'tenant_isolation_org_mismatch remoteApiSubscriptionOrganizationId_scoped '
+            'local=$localOrg cloud=$cloudOrg',
+          );
+        }
+        return null;
+      }
       if (isGuestSession) return null;
     }
 
     final voucherSess = VoucherSessionManager.instance.sessionNotifier.value;
     final fromVoucherSess = voucherSess?.organizationId.trim() ?? '';
-    if (fromVoucherSess.isNotEmpty) return fromVoucherSess;
+    if (fromVoucherSess.isNotEmpty) {
+      if (localOrg.isEmpty || fromVoucherSess == localOrg) {
+        return fromVoucherSess;
+      }
+      if (kDebugMode) {
+        debugPrint(
+          'tenant_isolation_org_mismatch remoteApiSubscriptionOrganizationId_voucher '
+          'local=$localOrg voucher=$fromVoucherSess',
+        );
+      }
+      return null;
+    }
 
     final vStatus = VoucherSessionManager.instance.statusNotifier.value;
     final fromStatus = vStatus.organizationId.trim();
-    if (fromStatus.isNotEmpty) return fromStatus;
-
-    final email = await remoteApiSubscriptionEmail();
-    if (email != null && email.contains('@')) {
-      final db = await _databaseService.database;
-      final localOrg = s?.organizationId.trim() ?? '';
-      if (localOrg.isNotEmpty) {
-        final cloud = await cloudOrganizationIdForSubscriptionEmail(
-          db,
-          email,
-          localOrg,
+    if (fromStatus.isNotEmpty) {
+      if (localOrg.isEmpty || fromStatus == localOrg) {
+        return fromStatus;
+      }
+      if (kDebugMode) {
+        debugPrint(
+          'tenant_isolation_org_mismatch remoteApiSubscriptionOrganizationId_status '
+          'local=$localOrg status=$fromStatus',
         );
-        if (cloud != null && cloud.isNotEmpty) return cloud;
       }
-      final su = await db.rawQuery(
-        '''
-        SELECT organizationId FROM signup_requests
-        WHERE lower(trim(email)) = ?
-        ORDER BY requestedAt DESC
-        LIMIT 1
-        ''',
-        [email.trim().toLowerCase()],
-      );
-      if (su.isNotEmpty) {
-        final oid = (su.first['organizationId'] as String?)?.trim() ?? '';
-        if (oid.isNotEmpty) return oid;
-      }
+      return null;
     }
 
-    final local = s?.organizationId.trim() ?? '';
-    return local.isEmpty ? null : local;
+    final email = await remoteApiSubscriptionEmail();
+    if (email != null && email.contains('@') && localOrg.isNotEmpty) {
+      final db = await _databaseService.database;
+      final cloud = await cloudOrganizationIdForSubscriptionEmail(
+        db,
+        email,
+        localOrg,
+      );
+      if (cloud != null && cloud.isNotEmpty) return cloud;
+    }
+
+    return localOrg.isEmpty ? null : localOrg;
   }
 
   /// يطبّق من خادم التفعيل تجميداً أو تمديداً إدارياً على صفوف [users] المطابقة لهوية الاشتراك.
@@ -2146,57 +2429,184 @@ class AccountingService {
     Map<String, Object?> subscriptionIdentityRow,
   ) async {
     if (!RemoteSignupConfig.activationServerEnabled) return false;
-    final idEmail = await _resolveLicensePullEmail(
+    final emails = await _candidateLicensePullEmails(
       db,
       s.organizationId,
       subscriptionIdentityRow,
     );
-    if (idEmail == null || !idEmail.contains('@')) return false;
-    final remoteOrgId =
-        (await remoteApiSubscriptionOrganizationId())?.trim() ?? '';
-    final pullOrgId =
-        remoteOrgId.isNotEmpty ? remoteOrgId : s.organizationId;
+    if (emails.isEmpty) return false;
+
+    var appliedAny = false;
+    for (var ei = 0; ei < emails.length; ei++) {
+      final idEmail = emails[ei];
+      var candidateOrgIds = await _candidatePullOrganizationIds(db, s, idEmail);
+      if (candidateOrgIds.isEmpty) {
+        final localOrg = s.organizationId.trim();
+        if (localOrg.isEmpty) return false;
+        candidateOrgIds = [localOrg];
+      }
+
+      for (var i = 0; i < candidateOrgIds.length; i++) {
+        final pullOrgId = candidateOrgIds[i];
+        if (pullOrgId.trim() != s.organizationId.trim()) {
+          if (kDebugMode) {
+            debugPrint(
+              'tenant_isolation_org_mismatch _pullRemoteSubscriptionIntoLocal '
+              'local=${s.organizationId} pull=$pullOrgId email=$idEmail',
+            );
+          }
+          continue;
+        }
+        final isLastCandidate =
+            ei == emails.length - 1 && i == candidateOrgIds.length - 1;
+        final applied = await _applyRemoteLicensePull(
+          db: db,
+          s: s,
+          idEmail: idEmail,
+          pullOrgId: pullOrgId,
+          allowLocalCleanupOnEmptySnapshot: isLastCandidate,
+        );
+        if (!applied) continue;
+        appliedAny = true;
+        // لا تتوقف عند أول لقطة ضعيفة (تجربة/منتهية) إن وُجد اشتراك رسمي لاحقاً.
+        if (_remotePosPhase == PosSubscriptionPhase.official ||
+            _remoteLegacyActivated) {
+          return true;
+        }
+      }
+    }
+    return appliedAny;
+  }
+
+  /// سحب ترخيص صريح من الخادم (يُستدعى عند فتح شاشة التفعيل).
+  Future<bool> refreshSubscriptionLicenseFromServer() async {
+    if (!RemoteSignupConfig.activationServerEnabled) return false;
+    final email = await remoteApiSubscriptionEmail();
+    if (email == null || !email.contains('@')) return false;
+    final db = await _databaseService.database;
+    final s = _session;
+    final orgId = (s?.organizationId.trim().isNotEmpty == true)
+        ? s!.organizationId.trim()
+        : ((await remoteApiSubscriptionOrganizationId())?.trim() ?? '');
+    if (orgId.isEmpty) {
+      if (kDebugMode) {
+        debugPrint(
+          'tenant_isolation_organization_required refreshSubscriptionLicenseFromServer '
+          'email=$email',
+        );
+      }
+      return false;
+    }
+    final stub = AppUserSession(
+      organizationId: orgId,
+      branchId: s?.branchId ?? '',
+      userId: s?.userId ?? '',
+      role: s?.role ?? 'owner',
+      username: email,
+    );
+    final row = <String, Object?>{
+      'email': email,
+      'username': email,
+    };
+    final ok = await _pullRemoteSubscriptionIntoLocal(db, stub, row);
+    if (ok) {
+      final now = DateTime.now();
+      final annualEnd =
+          _remoteAnnualEndAt ?? _annualEndFromRemoteDaysRemaining(now);
+      if (_annualCoverageActive(now, annualEnd)) {
+        licenseGate.applyAccountSubscription(annualEndAt: annualEnd);
+        licenseGate.applyAccountTrial(trialEndAt: null);
+        licenseGate.setRegisteredPendingActivation(false);
+      } else if (_remoteTrialActive) {
+        final trialEnd = _trialEndFromRemoteDaysRemaining(now) ??
+            now.add(const Duration(days: 1));
+        licenseGate.applyAccountTrial(trialEndAt: trialEnd);
+        licenseGate.setRegisteredPendingActivation(false);
+      }
+    }
+    return ok;
+  }
+
+  Future<bool> _applyRemoteLicensePull({
+    required Database db,
+    required AppUserSession s,
+    required String idEmail,
+    required String pullOrgId,
+    required bool allowLocalCleanupOnEmptySnapshot,
+  }) async {
     try {
       final api = RemoteSignupApi(
         baseUrl: RemoteSignupConfig.apiBaseUrl,
         sharedSecret: RemoteSignupConfig.sharedSecret,
       );
       final installId = await DeviceBinding.readInstallationId();
+      final deviceMeta =
+          DeviceBinding.activationApiDeviceMeta(installationId: installId);
       final pull = await api.pullLicensePolicy(
         organizationId: pullOrgId,
         email: idEmail,
         installationId: installId,
+        devicePlatform: DeviceBinding.readDevicePlatform(),
+        deviceFingerprint: deviceMeta['deviceFingerprint'],
+        computerName: deviceMeta['computerName'],
+        osUser: deviceMeta['osUser'],
+        osName: deviceMeta['osName'],
       );
       if (pull == null) return false;
-      await _applyBroadcastNoticeFromPull(pull);
-      await _persistDistributorCloudFromPull(db, s.organizationId, pull);
-      // لوحة التفعيل حذفت اللقطة وطلب التسجيل بالكامل — امسح المرآة المحلية لطلبات التسجيل وارتباط المستخدمين.
+
       final hasLicSnap =
-          pull[LicensePullResponseKeys.hasLicenseSnapshot];
-      final hasSignupSrv = pull[LicensePullResponseKeys.hasSignupRequest];
-      if (hasLicSnap == false && hasSignupSrv == false) {
-        final pendingIds = await db.query(
-          'signup_requests',
-          columns: ['id'],
-          where: 'organizationId = ? AND lower(trim(email)) = ?',
-          whereArgs: <Object?>[s.organizationId, idEmail],
-        );
-        await db.delete(
-          'signup_requests',
-          where: 'organizationId = ? AND lower(trim(email)) = ?',
-          whereArgs: <Object?>[s.organizationId, idEmail],
-        );
-        for (final pr in pendingIds) {
-          final sid = pr['id'] as String?;
-          if (sid == null || sid.isEmpty) continue;
-          await db.update(
-            'users',
-            <String, Object?>{'fromSignupRequestId': null},
-            where: 'organizationId = ? AND fromSignupRequestId = ?',
-            whereArgs: <Object?>[s.organizationId, sid],
+          pull[LicensePullResponseKeys.hasLicenseSnapshot] == true;
+      final hasSignupSrv =
+          pull[LicensePullResponseKeys.hasSignupRequest] == true;
+      if (!hasLicSnap && !hasSignupSrv) {
+        if (allowLocalCleanupOnEmptySnapshot) {
+          final pendingIds = await db.query(
+            'signup_requests',
+            columns: ['id'],
+            where: 'organizationId = ? AND lower(trim(email)) = ?',
+            whereArgs: <Object?>[s.organizationId, idEmail],
+          );
+          await db.delete(
+            'signup_requests',
+            where: 'organizationId = ? AND lower(trim(email)) = ?',
+            whereArgs: <Object?>[s.organizationId, idEmail],
+          );
+          for (final pr in pendingIds) {
+            final sid = pr['id'] as String?;
+            if (sid == null || sid.isEmpty) continue;
+            await db.update(
+              'users',
+              <String, Object?>{'fromSignupRequestId': null},
+              where: 'organizationId = ? AND fromSignupRequestId = ?',
+              whereArgs: <Object?>[s.organizationId, sid],
+            );
+          }
+        }
+        return false;
+      }
+      if (!hasLicSnap) {
+        return false;
+      }
+      final resolvedRaw = pull[LicensePullResponseKeys.resolvedOrganizationId];
+      final resolvedOrg = resolvedRaw is String ? resolvedRaw.trim() : '';
+      final localOrg = s.organizationId.trim();
+      final effectiveResolved =
+          resolvedOrg.isNotEmpty ? resolvedOrg : pullOrgId.trim();
+      if (effectiveResolved.isEmpty ||
+          localOrg.isEmpty ||
+          effectiveResolved != localOrg ||
+          pullOrgId.trim() != localOrg) {
+        if (kDebugMode) {
+          debugPrint(
+            'tenant_isolation_org_mismatch _applyRemoteLicensePull '
+            'local=$localOrg pull=$pullOrgId resolved=$effectiveResolved '
+            'email=$idEmail',
           );
         }
+        return false;
       }
+      _lastPullCanonicalOrganizationId = localOrg;
+
       final suspended = activationApiReadBool(
         pull,
         LicensePullResponseKeys.accessSuspended,
@@ -2209,68 +2619,292 @@ class AccountingService {
         pull,
         LicensePullResponseKeys.legacyActivated,
       );
-      const whereClause =
-          'organizationId = ? AND lower(trim(COALESCE(NULLIF(email, \'\'), username))) = ?';
-      final args = <Object?>[s.organizationId, idEmail];
+      _remoteAnnualEndAt = parseLicenseDateTime(subIso);
+      final subDaysRaw = pull[LicensePullResponseKeys.subscriptionDaysRemaining];
+      _remoteSubscriptionDaysRemaining = subDaysRaw is int
+          ? subDaysRaw
+          : (subDaysRaw is num ? subDaysRaw.toInt() : null);
+      final trialIso = activationApiReadIsoString(
+        pull,
+        LicensePullResponseKeys.trialEndAt,
+      );
+      _remoteTrialActive = activationApiReadBool(
+        pull,
+        LicensePullResponseKeys.trialActive,
+      );
+      final daysRemRaw = pull[LicensePullResponseKeys.trialDaysRemaining];
+      _remoteTrialDaysRemaining = daysRemRaw is int
+          ? daysRemRaw
+          : (daysRemRaw is num ? daysRemRaw.toInt() : null);
+      _remoteTrialEndAt = parseLicenseDateTime(trialIso);
+      _remoteSubscriptionExpired = activationApiReadBool(
+        pull,
+        LicensePullResponseKeys.subscriptionExpired,
+      );
+      final planRaw = pull[LicensePullResponseKeys.subscriptionPlanType];
+      if (planRaw is String && planRaw.trim().isNotEmpty) {
+        _remoteSubscriptionPlanType = planRaw.trim().toLowerCase();
+      } else {
+        _remoteSubscriptionPlanType = null;
+      }
+      final phaseRaw = pull[LicensePullResponseKeys.posSubscriptionPhase];
+      _remotePosPhase = phaseRaw is String
+          ? parsePosSubscriptionPhase(phaseRaw)
+          : null;
+      _remoteOfficialUntil = parseLicenseDateTime(
+        activationApiReadIsoString(pull, LicensePullResponseKeys.officialUntil),
+      );
+      _remoteLegacyActivated = legacyPull;
+
+      final deviceAllowed = pull[LicensePullResponseKeys.deviceAccessAllowed];
+      final limitsEnforced = activationApiReadBool(
+        pull,
+        LicensePullResponseKeys.emailDeviceLimitsEnforced,
+      );
+      if (deviceAllowed == false && limitsEnforced) {
+        _emailDeviceAccessDenied = true;
+        final err = pull[LicensePullResponseKeys.deviceLimitError];
+        _emailDeviceLimitError = err is String ? err.trim() : null;
+        // حد الأجهزة ≠ انتهاء الاشتراك — احفظ التغطية السنوية/التجربة محلياً.
+        _remoteSubscriptionExpired = false;
+      } else {
+        _emailDeviceAccessDenied = false;
+        _emailDeviceLimitError = null;
+      }
+      await _applyBroadcastNoticeFromPull(pull);
+      await _persistDistributorCloudFromPull(db, s.organizationId, pull);
       if (suspended) {
-        await db.update(
-          'users',
+        await _updateSubscriberUserRowsByEmail(
+          db,
+          s.organizationId,
+          idEmail,
           <String, Object?>{
             'subscriptionAnnualUntil': null,
             'subscriptionLegacyActivated': 0,
             'subscriptionAccessSuspended': 1,
+            'subscriptionTrialEndAt': null,
           },
-          where: whereClause,
-          whereArgs: args,
         );
+        licenseGate.setAccountAccessSuspended(true);
+        licenseGate.clearAccountSubscription();
+        licenseGate.setRegisteredPendingActivation(false);
         return true;
       }
+      licenseGate.setAccountAccessSuspended(false);
       if (legacyPull) {
-        await db.update(
-          'users',
+        await _updateSubscriberUserRowsByEmail(
+          db,
+          s.organizationId,
+          idEmail,
           <String, Object?>{
             'subscriptionAnnualUntil': null,
             'subscriptionLegacyActivated': 1,
             'webActivationPending': 0,
             'subscriptionAccessSuspended': 0,
+            'subscriptionTrialEndAt': null,
           },
-          where: whereClause,
-          whereArgs: args,
         );
+        licenseGate.applyAccountSubscription(
+          annualEndAt: null,
+          legacyActivated: true,
+        );
+        licenseGate.applyAccountTrial(trialEndAt: null);
+        licenseGate.setRegisteredPendingActivation(false);
         return true;
       }
-      final parsed = subIso != null && subIso.trim().isNotEmpty
-          ? DateTime.tryParse(subIso.trim())
-          : null;
-      if (parsed != null) {
-        await db.update(
-          'users',
+      final parsed = parseLicenseDateTime(subIso);
+      final now = DateTime.now();
+      final trialEndCandidate = parseLicenseDateTime(trialIso) ??
+          _remoteTrialEndAt ??
+          _trialEndFromRemoteDaysRemaining(now);
+      final applyAsTrial = _remoteIndicatesEmailTrial() ||
+          (_remoteTrialActive &&
+              (parsed == null ||
+                  !AccountingService.isSubscriptionEndDateActive(now, parsed) ||
+                  (trialEndCandidate != null &&
+                      AccountingService.isSubscriptionEndDateActive(
+                        now,
+                        trialEndCandidate,
+                      )))) ||
+          (trialEndCandidate != null &&
+              AccountingService.isSubscriptionEndDateActive(
+                now,
+                trialEndCandidate,
+              ) &&
+              (parsed == null ||
+                  _datesSameCalendarDay(parsed, trialEndCandidate)));
+
+      if (applyAsTrial) {
+        final trialEnd = trialEndCandidate ??
+            (parsed != null &&
+                    AccountingService.isSubscriptionEndDateActive(now, parsed)
+                ? parsed
+                : null) ??
+            now.add(const Duration(days: 1));
+        final trialIsoStored = (trialIso != null && trialIso.trim().isNotEmpty)
+            ? trialIso.trim()
+            : trialEnd.toUtc().toIso8601String();
+        await _updateSubscriberUserRowsByEmail(
+          db,
+          s.organizationId,
+          idEmail,
+          <String, Object?>{
+            'subscriptionAnnualUntil': null,
+            'subscriptionLegacyActivated': 0,
+            'webActivationPending': 0,
+            'subscriptionAccessSuspended': 0,
+            'subscriptionTrialEndAt': trialIsoStored,
+          },
+        );
+        _remoteAnnualEndAt = null;
+        _remotePosPhase ??= PosSubscriptionPhase.emailTrial;
+        licenseGate.applyAccountSubscription(annualEndAt: null);
+        licenseGate.applyAccountTrial(trialEndAt: trialEnd);
+        licenseGate.setRegisteredPendingActivation(false);
+      } else if (parsed != null) {
+        await _updateSubscriberUserRowsByEmail(
+          db,
+          s.organizationId,
+          idEmail,
           <String, Object?>{
             'subscriptionAnnualUntil': parsed.toIso8601String(),
             'subscriptionLegacyActivated': 0,
             'webActivationPending': 0,
             'subscriptionAccessSuspended': 0,
+            'subscriptionTrialEndAt': null,
           },
-          where: whereClause,
-          whereArgs: args,
         );
-      } else {
-        // الخادم لا يعيد تاريخاً فعّالاً (حذف لقطة، أو لا يوجد تمديد) — امسح المرآة المحلية لتطابق لوحة التفعيل.
-        await db.update(
-          'users',
+        licenseGate.applyAccountSubscription(annualEndAt: parsed);
+        licenseGate.applyAccountTrial(trialEndAt: null);
+        licenseGate.setRegisteredPendingActivation(false);
+      } else if (subIso == null || subIso.trim().isEmpty) {
+        await _updateSubscriberUserRowsByEmail(
+          db,
+          s.organizationId,
+          idEmail,
           <String, Object?>{
             'subscriptionAnnualUntil': null,
             'subscriptionLegacyActivated': 0,
             'subscriptionAccessSuspended': 0,
+            'subscriptionTrialEndAt': trialIso,
+            'webActivationPending': 0,
           },
-          where: whereClause,
-          whereArgs: args,
         );
+        final trialEnd = parseLicenseDateTime(trialIso) ??
+            _trialEndFromRemoteDaysRemaining(now);
+        if (_remoteTrialActive ||
+            (trialEnd != null && now.isBefore(trialEnd))) {
+          licenseGate.applyAccountSubscription(annualEndAt: null);
+          licenseGate.applyAccountTrial(
+            trialEndAt: trialEnd ?? now.add(const Duration(days: 1)),
+          );
+          licenseGate.setRegisteredPendingActivation(false);
+        }
+      } else {
+        await _updateSubscriberUserRowsByEmail(
+          db,
+          s.organizationId,
+          idEmail,
+          <String, Object?>{
+            'subscriptionAnnualUntil': subIso.trim(),
+            'subscriptionLegacyActivated': 0,
+            'webActivationPending': 0,
+            'subscriptionAccessSuspended': 0,
+            'subscriptionTrialEndAt': null,
+          },
+        );
+        _remoteAnnualEndAt = parseLicenseDateTime(subIso.trim());
+        final annualEnd = _remoteAnnualEndAt ??
+            _annualEndFromRemoteDaysRemaining(now);
+        if (annualEnd != null) {
+          licenseGate.applyAccountSubscription(annualEndAt: annualEnd);
+          licenseGate.applyAccountTrial(trialEndAt: null);
+          licenseGate.setRegisteredPendingActivation(false);
+        }
+      }
+      // شبكة أمان: أيام متبقية ≠ سنوي إن كانت التجربة هي الحالة.
+      if (!_remoteIndicatesEmailTrial() &&
+          !_remoteTrialActive &&
+          (_remoteSubscriptionDaysRemaining ?? 0) > 0 &&
+          licenseGate.annualEndAt == null &&
+          !licenseGate.hasActiveEmailTrial(now)) {
+        final fallbackEnd = _remoteAnnualEndAt ??
+            _annualEndFromRemoteDaysRemaining(now) ??
+            now.add(Duration(days: _remoteSubscriptionDaysRemaining!));
+        licenseGate.applyAccountSubscription(annualEndAt: fallbackEnd);
+        licenseGate.applyAccountTrial(trialEndAt: null);
+        licenseGate.setRegisteredPendingActivation(false);
       }
       return true;
     } on Object {
       return false;
     }
+  }
+
+  static DateTime? parseLicenseDateTime(String? raw) {
+    final t = raw?.trim() ?? '';
+    if (t.isEmpty) return null;
+    var parsed = DateTime.tryParse(t);
+    if (parsed != null) return parsed;
+    if (t.contains(' ') && !t.contains('T')) {
+      parsed = DateTime.tryParse(t.replaceFirst(' ', 'T'));
+      if (parsed != null) return parsed;
+    }
+    return null;
+  }
+
+  static bool isSubscriptionEndDateActive(DateTime now, DateTime? end) {
+    if (end == null) return false;
+    if (now.isBefore(end)) return true;
+    final a = DateTime(now.year, now.month, now.day);
+    final b = DateTime(end.year, end.month, end.day);
+    return !a.isAfter(b);
+  }
+
+  Future<int> _updateSubscriberUserRowsByEmail(
+    Database db,
+    String localOrganizationId,
+    String email,
+    Map<String, Object?> fields,
+  ) async {
+    final em = email.trim().toLowerCase();
+    const matchEmail =
+        "lower(trim(COALESCE(NULLIF(email, ''), username))) = ?";
+    var n = await db.update(
+      'users',
+      fields,
+      where: 'organizationId = ? AND $matchEmail',
+      whereArgs: [localOrganizationId, em],
+    );
+    if (n > 0) return n;
+    n = await db.update(
+      'users',
+      fields,
+      where: matchEmail,
+      whereArgs: [em],
+    );
+    if (n > 0) return n;
+    final org = localOrganizationId.trim();
+    if (org.isEmpty) return 0;
+    n = await db.update(
+      'users',
+      fields,
+      where: 'organizationId = ? AND lower(trim(role)) = ?',
+      whereArgs: [org, 'owner'],
+    );
+    if (n > 0) return n;
+    final sess = _session;
+    if (sess != null &&
+        sess.organizationId.trim() == org &&
+        sess.userId.trim().isNotEmpty) {
+      return db.update(
+        'users',
+        fields,
+        where: 'id = ? AND organizationId = ?',
+        whereArgs: [sess.userId, org],
+      );
+    }
+    return 0;
   }
 
   Future<void> _persistDistributorCloudFromPull(
@@ -2552,6 +3186,44 @@ class AccountingService {
       hasDistributorCloudAccess &&
       (_sessionDistributorCloudEnabled ?? false);
 
+  DateTime? _annualEndFromRemoteDaysRemaining(DateTime now) {
+    if (_remoteSubscriptionExpired) return null;
+    if (_remoteIndicatesEmailTrial() || _remoteTrialActive) return null;
+    if (_remoteAnnualEndAt != null) return _remoteAnnualEndAt;
+    final days = _remoteSubscriptionDaysRemaining;
+    if (days == null || days <= 0) return null;
+    final today = DateTime(now.year, now.month, now.day);
+    return today.add(Duration(days: days));
+  }
+
+  DateTime? _trialEndFromRemoteDaysRemaining(DateTime now) {
+    if (!_remoteTrialActive && !_remoteIndicatesEmailTrial()) return null;
+    final days = _remoteTrialDaysRemaining;
+    if (days == null || days <= 0) return null;
+    final today = DateTime(now.year, now.month, now.day);
+    return today.add(Duration(days: days));
+  }
+
+  static bool _datesSameCalendarDay(DateTime a, DateTime b) {
+    return a.year == b.year && a.month == b.month && a.day == b.day;
+  }
+
+  bool _annualCoverageActive(DateTime now, DateTime? end) {
+    if (_remoteIndicatesEmailTrial() || _remoteTrialActive) return false;
+    if (AccountingService.isSubscriptionEndDateActive(now, end)) return true;
+    if (AccountingService.isSubscriptionEndDateActive(now, _remoteAnnualEndAt)) {
+      return true;
+    }
+    // لا تُفسَّر أيام متبقية وحدها كاشتراك سنوي (كانت تُنسخ من التجربة).
+    if ((_remoteSubscriptionDaysRemaining ?? 0) > 0 &&
+        (_remoteAnnualEndAt != null || end != null)) {
+      final plan = (_remoteSubscriptionPlanType ?? '').trim().toLowerCase();
+      if (plan == 'trial') return false;
+      return true;
+    }
+    return false;
+  }
+
   /// يقرأ تجربة/جدّ الجهاز من الملف ثم يطبّق اشتراك المؤسسة من جدول [users].
   ///
   /// حقول الاشتراك (`subscriptionAnnualUntil` / `subscriptionLegacyActivated`) تُحدَّث
@@ -2562,12 +3234,25 @@ class AccountingService {
     await licenseGate.reloadDeviceTrialState();
     licenseGate.setRegisteredPendingActivation(false);
     _subscriptionBindingMismatch = false;
+    _emailDeviceAccessDenied = false;
+    _emailDeviceLimitError = null;
+    _remoteTrialActive = false;
+    _lastPullCanonicalOrganizationId = null;
+    _remoteTrialDaysRemaining = null;
+    _remoteTrialEndAt = null;
+    _remoteAnnualEndAt = null;
+    _remoteSubscriptionDaysRemaining = null;
+    _remotePosPhase = null;
+    _remoteOfficialUntil = null;
+    _remoteLegacyActivated = false;
     final s = _session;
     if (s == null || isGuestSession) {
       licenseGate.clearAccountSubscription();
       licenseGate.setAccountAccessSuspended(false);
       licenseGate.clearDistributorCloud();
       _sessionDistributorCloudEnabled = false;
+      _remoteSubscriptionPlanType = null;
+      _remoteSubscriptionExpired = false;
       return;
     }
     final db = await _databaseService.database;
@@ -2579,6 +3264,7 @@ class AccountingService {
       'id',
       'subscriptionAnnualUntil',
       'subscriptionLegacyActivated',
+      'subscriptionTrialEndAt',
       'subscriptionDeviceBinding',
       'email',
       'username',
@@ -2599,14 +3285,21 @@ class AccountingService {
     DateTime? parseAnnualEnd(Map<String, Object?> row) {
       final au = (row['subscriptionAnnualUntil'] as String?)?.trim();
       if (au == null || au.isEmpty) return null;
-      return DateTime.tryParse(au);
+      return parseLicenseDateTime(au);
+    }
+
+    DateTime? parseTrialEnd(Map<String, Object?> row) {
+      final tu = (row['subscriptionTrialEndAt'] as String?)?.trim();
+      if (tu == null || tu.isEmpty) return null;
+      return parseLicenseDateTime(tu);
     }
 
     ({DateTime? end, bool legacy, bool annualActive, bool legacyActive})
         subscriptionState(Map<String, Object?> row, DateTime now) {
       final end = parseAnnualEnd(row);
       final legacy = parseLegacyFlag(row['subscriptionLegacyActivated']);
-      final annualActive = end != null && now.isBefore(end);
+      final annualActive =
+          AccountingService.isSubscriptionEndDateActive(now, end);
       final legacyActive = legacy && end == null;
       return (
         end: end,
@@ -2637,7 +3330,10 @@ class AccountingService {
     }
 
     var st = subscriptionState(subRow, now);
-    if (!(st.annualActive || st.legacyActive)) {
+    var trialEndRow = parseTrialEnd(subRow);
+    var trialActiveRow =
+        trialEndRow != null && now.isBefore(trialEndRow);
+    if (!(st.annualActive || st.legacyActive || trialActiveRow)) {
       final owners = await db.query(
         'users',
         columns: subCols,
@@ -2650,9 +3346,14 @@ class AccountingService {
         final or = owners.first;
         if ((or['id'] as String?) != s.userId) {
           final ot = subscriptionState(or, now);
-          if (ot.annualActive || ot.legacyActive) {
+          final otTrial = parseTrialEnd(or);
+          final otTrialActive =
+              otTrial != null && now.isBefore(otTrial);
+          if (ot.annualActive || ot.legacyActive || otTrialActive) {
             subRow = or;
             st = ot;
+            trialEndRow = otTrial;
+            trialActiveRow = otTrialActive;
           }
         }
       }
@@ -2661,6 +3362,28 @@ class AccountingService {
     final subscriptionRemotePullOk =
         await _pullRemoteSubscriptionIntoLocal(db, s, subRow);
 
+    if (_emailDeviceAccessDenied) {
+      final trialEnd = _trialEndFromRemoteDaysRemaining(now) ?? _remoteTrialEndAt;
+      final annualEnd = _remoteAnnualEndAt ?? _annualEndFromRemoteDaysRemaining(now);
+      final trialActive = _remoteIndicatesEmailTrial() ||
+          _remoteTrialActive ||
+          (trialEnd != null && now.isBefore(trialEnd));
+      final annualActive =
+          !trialActive && _annualCoverageActive(now, annualEnd);
+      licenseGate.applyAccountSubscription(
+        annualEndAt: annualActive ? annualEnd : null,
+        legacyActivated: false,
+      );
+      licenseGate.applyAccountTrial(
+        trialEndAt: trialActive
+            ? (trialEnd ?? now.add(const Duration(days: 1)))
+            : null,
+      );
+      licenseGate.setRegisteredPendingActivation(false);
+      licenseGate.setAccountAccessSuspended(false);
+      return;
+    }
+
     subRow = await userSubRow(s.userId);
     if (subRow == null) {
       licenseGate.clearAccountSubscription();
@@ -2668,7 +3391,9 @@ class AccountingService {
       return;
     }
     st = subscriptionState(subRow, now);
-    if (!(st.annualActive || st.legacyActive)) {
+    trialEndRow = parseTrialEnd(subRow);
+    trialActiveRow = trialEndRow != null && now.isBefore(trialEndRow);
+    if (!(st.annualActive || st.legacyActive || trialActiveRow)) {
       final owners = await db.query(
         'users',
         columns: subCols,
@@ -2681,9 +3406,13 @@ class AccountingService {
         final or = owners.first;
         if ((or['id'] as String?) != s.userId) {
           final ot = subscriptionState(or, now);
-          if (ot.annualActive || ot.legacyActive) {
+          final otTrial = parseTrialEnd(or);
+          final otTrialActive = otTrial != null && now.isBefore(otTrial);
+          if (ot.annualActive || ot.legacyActive || otTrialActive) {
             subRow = or;
             st = ot;
+            trialEndRow = otTrial;
+            trialActiveRow = otTrialActive;
           }
         }
       }
@@ -2699,10 +3428,26 @@ class AccountingService {
     }
     licenseGate.setAccountAccessSuspended(false);
 
-    final end = st.end;
+    final end = st.end ?? _remoteAnnualEndAt ?? _annualEndFromRemoteDaysRemaining(now);
     final legacy = st.legacy;
-    final annualActive = st.annualActive;
+    var annualActive = st.annualActive || _annualCoverageActive(now, end);
     final legacyActive = st.legacyActive;
+    final trialEnd = trialEndRow ??
+        parseTrialEnd(r) ??
+        _remoteTrialEndAt ??
+        _trialEndFromRemoteDaysRemaining(now);
+    var trialActive =
+        (trialEnd != null && now.isBefore(trialEnd)) || _remoteTrialActive;
+    if (_remoteIndicatesEmailTrial()) {
+      annualActive = false;
+      trialActive = true;
+    } else if (trialActive &&
+        annualActive &&
+        end != null &&
+        trialEnd != null &&
+        _datesSameCalendarDay(end, trialEnd)) {
+      annualActive = false;
+    }
 
     final role = s.role.trim().toLowerCase();
     final isOwner = role == 'owner';
@@ -2710,13 +3455,14 @@ class AccountingService {
     if (RemoteSignupConfig.activationServerEnabled &&
         isOwner &&
         AccountingService.rowWebActivationPending(r) &&
-        !(annualActive || legacyActive)) {
+        !(annualActive || legacyActive || trialActive)) {
       licenseGate.clearAccountSubscription();
+      licenseGate.applyAccountTrial(trialEndAt: trialEnd);
       licenseGate.setRegisteredPendingActivation(true);
       return;
     }
 
-    if (annualActive || legacyActive) {
+    if (annualActive || legacyActive || trialActive) {
       final bindingUserId = r['id'] as String;
       final rowUsername = (r['username'] as String?) ?? '';
       final identity = AccountingService.normalizeSubscriptionIdentity(
@@ -2738,9 +3484,28 @@ class AccountingService {
       }
 
       if (!_subscriptionBindingMatches(binding, tokenNow)) {
-        _subscriptionBindingMismatch = true;
-        licenseGate.clearAccountSubscription();
-        return;
+        // عند وجود تغطية سحابية فعّالة (تجربة/سنوي) أعد ربط الجهاز الحالي
+        // بدل مسح الاشتراك — وإلا يظهر «بانتظار التفعيل» رغم أن الخادم فعّال.
+        if (_remoteTrialActive ||
+            _annualCoverageActive(now, end) ||
+            trialActive ||
+            annualActive) {
+          await db.update(
+            'users',
+            {
+              'subscriptionDeviceBinding': tokenNow,
+              'webActivationPending': 0,
+            },
+            where: 'id = ?',
+            whereArgs: [bindingUserId],
+          );
+          binding = tokenNow;
+          _subscriptionBindingMismatch = false;
+        } else {
+          _subscriptionBindingMismatch = true;
+          licenseGate.clearAccountSubscription();
+          return;
+        }
       }
 
       if (AccountingService.rowWebActivationPending(r)) {
@@ -2754,17 +3519,58 @@ class AccountingService {
     }
 
     licenseGate.applyAccountSubscription(
-      annualEndAt: end,
-      legacyActivated: legacy,
+      annualEndAt: (annualActive && !trialActive) ? end : null,
+      legacyActivated: legacyActive,
+    );
+    licenseGate.applyAccountTrial(
+      trialEndAt: trialActive
+          ? (trialEnd ?? now.add(const Duration(days: 1)))
+          : null,
     );
 
-    var paidOrGrandfather =
-        annualActive || legacyActive || licenseGate.grandfatherFullAccess;
+    // أصلح صف المستخدم المحلي إن كانت التجربة فازت على تاريخ سنوي ملوّث.
+    if (trialActive && !annualActive) {
+      final trialIsoStored =
+          (trialEnd ?? now.add(const Duration(days: 1))).toUtc().toIso8601String();
+      final idEmail = AccountingService.normalizeSubscriptionIdentity(
+        r['email'] as String?,
+        (r['username'] as String?) ?? '',
+      );
+      if (idEmail.contains('@')) {
+        await _updateSubscriberUserRowsByEmail(
+          db,
+          s.organizationId,
+          idEmail,
+          <String, Object?>{
+            'subscriptionAnnualUntil': null,
+            'subscriptionTrialEndAt': trialIsoStored,
+            'subscriptionLegacyActivated': 0,
+          },
+        );
+      }
+    }
+
+    var paidOrGrandfather = annualActive ||
+        legacyActive ||
+        trialActive ||
+        licenseGate.grandfatherFullAccess;
     if (_voucherSubscriptionActiveOnDevice && role != 'distributor') {
       paidOrGrandfather = true;
     }
     if (!paidOrGrandfather && !_subscriptionBindingMismatch) {
-      licenseGate.setRegisteredPendingActivation(isOwner);
+      final trialExpiredLocally = trialEnd != null && !trialActive;
+      if (trialExpiredLocally || _remoteSubscriptionExpired) {
+        licenseGate.setRegisteredPendingActivation(false);
+      } else if (AccountingService.rowWebActivationPending(r)) {
+        licenseGate.setRegisteredPendingActivation(true);
+      } else {
+        licenseGate.setRegisteredPendingActivation(
+          isOwner &&
+              !_remoteTrialActive &&
+              !subscriptionIsTrial &&
+              !_annualCoverageActive(now, end),
+        );
+      }
     } else {
       licenseGate.setRegisteredPendingActivation(false);
     }
@@ -2788,17 +3594,24 @@ class AccountingService {
         subscriptionRemotePullOk) {
       final bindingPayload =
           await DeviceBinding.subscriptionBindingPayload(reportEmail);
+      final reportOrgId = _lastPullCanonicalOrganizationId?.trim().isNotEmpty ==
+              true
+          ? _lastPullCanonicalOrganizationId!.trim()
+          : ((await remoteApiSubscriptionOrganizationId())?.trim() ?? s.organizationId);
       unawaited(
         RemoteSignupApi(
           baseUrl: RemoteSignupConfig.apiBaseUrl,
           sharedSecret: RemoteSignupConfig.sharedSecret,
         ).reportLicenseSnapshot(
-          organizationId: s.organizationId,
+          organizationId: reportOrgId,
           email: reportEmail,
-          trialEndAt: null,
-          subscriptionAnnualUntil: end?.toUtc().toIso8601String(),
-          legacyActivated: legacy && end == null,
+          trialEndAt: trialActive ? trialEnd?.toUtc().toIso8601String() : null,
+          subscriptionAnnualUntil: (annualActive && !trialActive)
+              ? end?.toUtc().toIso8601String()
+              : null,
+          legacyActivated: legacy && end == null && !trialActive,
           subscriptionDeviceBinding: bindingPayload,
+          devicePlatform: DeviceBinding.readDevicePlatform(),
         ),
       );
     }
@@ -2855,8 +3668,14 @@ class AccountingService {
     await syncLicenseGate();
   }
 
-  /// البريد المرتبط بالحساب الحالي في [users]؛ إن كان فارغاً يُعاد [AppUserSession.username].
+  /// البريد المرتبط بالحساب الحالي؛ يُفضَّل بريد جلسة المشترك (حسابي).
   Future<String?> currentUserSubscriptionEmail() async {
+    final live = VoucherSessionManager.instance.sessionNotifier.value?.email
+            .trim()
+            .toLowerCase() ??
+        '';
+    if (_isRealSubscriptionEmail(live)) return live;
+
     final s = _session;
     if (s == null || isGuestSession) return null;
     final db = await _databaseService.database;
@@ -2909,6 +3728,10 @@ class AccountingService {
   Future<String?> subscriptionHolderDisplayName() async {
     final db = await _databaseService.database;
     final s = _session;
+    // زائر بلا قسيمة: لا تُعرض اسم مالك بيانات محلية قديمة كأنه صاحب الاشتراك.
+    if (isGuestSession && !VoucherSessionManager.instance.hasSession) {
+      return null;
+    }
     if (s != null && !isGuestSession) {
       final rows = await db.query(
         'users',
@@ -2977,6 +3800,7 @@ class AccountingService {
     required String phoneDigits,
     required String passwordPlain,
     bool markWebActivationPending = false,
+    String? trialEndAtIso,
   }) async {
     final branchId = await _primaryBranchIdForOrganization(db, organizationId);
     if (branchId == null || branchId.isEmpty) {
@@ -2985,6 +3809,9 @@ class AccountingService {
     final now = DateTime.now().toIso8601String();
     final pwdHash = PasswordCrypto.hash(passwordPlain);
     final webPen = markWebActivationPending ? 1 : 0;
+    final trialCol = (trialEndAtIso != null && trialEndAtIso.trim().isNotEmpty)
+        ? trialEndAtIso.trim()
+        : null;
     final existing = await db.rawQuery(
       '''
       SELECT id FROM users
@@ -3009,6 +3836,7 @@ class AccountingService {
           'accountStatus': 'active',
           'branchId': branchId,
           'webActivationPending': webPen,
+          'subscriptionTrialEndAt': trialCol,
         },
         where: 'id = ?',
         whereArgs: [uid],
@@ -3030,6 +3858,7 @@ class AccountingService {
       'accountStatus': 'active',
       'fromSignupRequestId': null,
       'webActivationPending': webPen,
+      'subscriptionTrialEndAt': trialCol,
     });
   }
 
@@ -3249,12 +4078,11 @@ class AccountingService {
       return 'auth_err_email_taken';
     }
 
-    final markWebActivationPending = RemoteSignupConfig.activationServerEnabled &&
-        RemoteSignupConfig.publicSignupServerEnabled;
+    const markWebActivationPending = false;
 
     if (RemoteSignupConfig.publicSignupServerEnabled) {
       try {
-        await RemoteSignupApi(
+        final signupResult = await RemoteSignupApi(
           baseUrl: RemoteSignupConfig.apiBaseUrl,
           sharedSecret: RemoteSignupConfig.sharedSecret,
         ).submitSignup(
@@ -3274,6 +4102,7 @@ class AccountingService {
           phoneDigits: phoneDigits,
           passwordPlain: password,
           markWebActivationPending: markWebActivationPending,
+          trialEndAtIso: signupResult.trialEndAt,
         );
         return null;
       } on RemoteSignupOfflineException {
@@ -3572,14 +4401,20 @@ class AccountingService {
     return ok;
   }
 
-  /// هل اشتراك القسيمة ساري على هذا الجهاز؟ (يُعامل كتفعيل كامل للعمليات المحلية).
+  /// تفعيل كامل للجهاز: ترخيص (تجربة/سنوي) — أو قسيمة إن كان نظام القسيمة مفعّلاً.
   bool get _voucherSubscriptionActiveOnDevice {
+    if (licenseGate.hasPaidCoverage(DateTime.now())) return true;
+    if (!SubscriptionVoucherConfig.enabled) return false;
     try {
       return VoucherSessionManager.instance.status.isActive;
     } on Object {
       return false;
     }
   }
+
+  /// قسيمة Miza سارية على هذا الجهاز (معطّلة عند إلغاء نظام القسيمة؛
+  /// تُرجع true أيضاً عند وجود ترخيص مدفوع/تجربة لبقاء البوابات متوافقة).
+  bool get hasVoucherOnDevice => _voucherSubscriptionActiveOnDevice;
 
   /// الدور الظاهر في شريط الهوية — جلسة الموظف أو مالك القسيمة المفعّلة.
   String get appBarDisplayRole {
@@ -3841,13 +4676,10 @@ class AccountingService {
   static const int trialCatalogProductLimit =
       ProductCatalogTrialLimitException.limit;
 
-  /// أقصى منتجات مميزة في فاتورة بيع/شراء بدون تفعيل القسيمة.
+  /// أقصى منتجات مميزة في فاتورة بيع/شراء بدون تفعيل كامل.
   static const int trialTransactionDistinctProductLimit = 5;
 
-  /// قسيمة Miza سارية على هذا الجهاز.
-  bool get hasVoucherOnDevice => _voucherSubscriptionActiveOnDevice;
-
-  /// هل نعرض «تسجيل الدخول بحساب آخر»؟ المدير مع قسيمة مفعّلة: لا — يكفي الخروج.
+  /// هل نعرض «تسجيل الدخول بحساب آخر»؟ المدير مع تفعيل كامل: لا — يكفي الخروج.
   bool get offerStaffAccountSwitch {
     if (_session == null) return true;
     if (isGuestSession) {
@@ -4520,6 +5352,23 @@ class AccountingService {
       whereArgs: [id, s.organizationId, s.branchId],
     );
     await _audit('update', 'customers', id, 'Updated customer $nm');
+    await _syncCatalogOutbox(
+      entityType: PartnersSyncConstants.entityTypeCustomer,
+      operation: 'update',
+      entityId: id,
+      payload: partnerEntityCloudPayload(
+        id: id,
+        organizationId: s.organizationId,
+        branchId: s.branchId,
+        name: nm,
+        partnerNumber: cn,
+        phone: phone?.trim(),
+        address: address?.trim(),
+        notes: cleanNotes.isEmpty ? null : cleanNotes,
+        creditLimit: creditLimit,
+        overdueAlertDays: overdueAlertDays,
+      ),
+    );
   }
 
   Future<void> deleteCustomer(String id) async {
@@ -4545,15 +5394,40 @@ class AccountingService {
     if (nLed > 0) {
       throw Exception('لا يمكن حذف عميل له حركات في دفتر الذمم (أرصدة/دفعات).');
     }
-    final deleted = await db.delete(
+    final rows = await db.query(
+      'customers',
+      where: 'id = ? AND organizationId = ? AND branchId = ?',
+      whereArgs: [id, s.organizationId, s.branchId],
+      limit: 1,
+    );
+    if (rows.isEmpty) {
+      throw Exception('العميل غير موجود.');
+    }
+    final row = rows.first;
+    await db.delete(
       'customers',
       where: 'id = ? AND organizationId = ? AND branchId = ?',
       whereArgs: [id, s.organizationId, s.branchId],
     );
-    if (deleted == 0) {
-      throw Exception('العميل غير موجود.');
-    }
     await _audit('delete', 'customers', id, 'Deleted customer $id');
+    await _syncCatalogOutbox(
+      entityType: PartnersSyncConstants.entityTypeCustomer,
+      operation: 'delete',
+      entityId: id,
+      payload: partnerEntityCloudPayload(
+        id: id,
+        organizationId: s.organizationId,
+        branchId: s.branchId,
+        name: (row['name'] ?? '').toString(),
+        partnerNumber: row['customerNumber']?.toString(),
+        phone: row['phone']?.toString(),
+        address: row['address']?.toString(),
+        notes: row['notes']?.toString(),
+        creditLimit: (row['creditLimit'] as num?)?.toDouble() ?? 0,
+        overdueAlertDays: (row['overdueAlertDays'] as num?)?.toInt(),
+        deleted: true,
+      ),
+    );
   }
 
   Future<void> updateSupplier({
@@ -4589,6 +5463,21 @@ class AccountingService {
       whereArgs: [id, s.organizationId, s.branchId],
     );
     await _audit('update', 'suppliers', id, 'Updated supplier $nm');
+    await _syncCatalogOutbox(
+      entityType: PartnersSyncConstants.entityTypeSupplier,
+      operation: 'update',
+      entityId: id,
+      payload: partnerEntityCloudPayload(
+        id: id,
+        organizationId: s.organizationId,
+        branchId: s.branchId,
+        name: nm,
+        partnerNumber: sn,
+        phone: phone?.trim(),
+        address: address?.trim(),
+        notes: cleanNotes.isEmpty ? null : cleanNotes,
+      ),
+    );
   }
 
   Future<void> deleteSupplier(String id) async {
@@ -4614,15 +5503,38 @@ class AccountingService {
     if (nLed > 0) {
       throw Exception('لا يمكن حذف مورد له حركات في دفتر الذمم (أرصدة/دفعات).');
     }
-    final deleted = await db.delete(
+    final rows = await db.query(
+      'suppliers',
+      where: 'id = ? AND organizationId = ? AND branchId = ?',
+      whereArgs: [id, s.organizationId, s.branchId],
+      limit: 1,
+    );
+    if (rows.isEmpty) {
+      throw Exception('المورد غير موجود.');
+    }
+    final row = rows.first;
+    await db.delete(
       'suppliers',
       where: 'id = ? AND organizationId = ? AND branchId = ?',
       whereArgs: [id, s.organizationId, s.branchId],
     );
-    if (deleted == 0) {
-      throw Exception('المورد غير موجود.');
-    }
     await _audit('delete', 'suppliers', id, 'Deleted supplier $id');
+    await _syncCatalogOutbox(
+      entityType: PartnersSyncConstants.entityTypeSupplier,
+      operation: 'delete',
+      entityId: id,
+      payload: partnerEntityCloudPayload(
+        id: id,
+        organizationId: s.organizationId,
+        branchId: s.branchId,
+        name: (row['name'] ?? '').toString(),
+        partnerNumber: row['supplierNumber']?.toString(),
+        phone: row['phone']?.toString(),
+        address: row['address']?.toString(),
+        notes: row['notes']?.toString(),
+        deleted: true,
+      ),
+    );
   }
 
   Future<void> addMaster(String table, MasterEntity entity) async {
@@ -4653,6 +5565,41 @@ class AccountingService {
       'createdAt': DateTime.now().toIso8601String(),
     });
     await _audit('create', table, entity.id, 'Created ${entity.name}');
+    if (table == 'customers') {
+      await _syncCatalogOutbox(
+        entityType: PartnersSyncConstants.entityTypeCustomer,
+        operation: 'create',
+        entityId: entity.id,
+        payload: partnerEntityCloudPayload(
+          id: entity.id,
+          organizationId: entity.organizationId,
+          branchId: entity.branchId,
+          name: entity.name,
+          partnerNumber: partnerNumber,
+          phone: entity.phone,
+          address: entity.address,
+          notes: cleanNotes.isEmpty ? null : cleanNotes,
+          creditLimit: entity.creditLimit,
+          overdueAlertDays: entity.overdueAlertDays,
+        ),
+      );
+    } else if (table == 'suppliers') {
+      await _syncCatalogOutbox(
+        entityType: PartnersSyncConstants.entityTypeSupplier,
+        operation: 'create',
+        entityId: entity.id,
+        payload: partnerEntityCloudPayload(
+          id: entity.id,
+          organizationId: entity.organizationId,
+          branchId: entity.branchId,
+          name: entity.name,
+          partnerNumber: partnerNumber,
+          phone: entity.phone,
+          address: entity.address,
+          notes: cleanNotes.isEmpty ? null : cleanNotes,
+        ),
+      );
+    }
   }
 
   Future<String> _generatePartnerNumber({required String table}) async {
@@ -4897,6 +5844,17 @@ class AccountingService {
       throw Exception(_translateDbError(e));
     }
     await _audit('create', 'product_category', id, 'Created category $trimmed');
+    await _syncCatalogOutbox(
+      entityType: CatalogSyncConstants.entityTypeProductCategory,
+      operation: 'create',
+      entityId: id,
+      payload: namedEntityCloudPayload(
+        id: id,
+        organizationId: s.organizationId,
+        branchId: s.branchId,
+        name: trimmed,
+      ),
+    );
   }
 
   Future<void> updateProductCategoryName({
@@ -4928,6 +5886,17 @@ class AccountingService {
       rethrow;
     }
     await _audit('update', 'product_category', categoryId, 'Renamed category to $trimmed');
+    await _syncCatalogOutbox(
+      entityType: CatalogSyncConstants.entityTypeProductCategory,
+      operation: 'update',
+      entityId: categoryId,
+      payload: namedEntityCloudPayload(
+        id: categoryId,
+        organizationId: s.organizationId,
+        branchId: s.branchId,
+        name: trimmed,
+      ),
+    );
   }
 
   Future<void> deleteProductCategory(String categoryId) async {
@@ -4952,6 +5921,18 @@ class AccountingService {
       }
     });
     await _audit('delete', 'product_category', categoryId, 'Deleted category');
+    await _syncCatalogOutbox(
+      entityType: CatalogSyncConstants.entityTypeProductCategory,
+      operation: 'delete',
+      entityId: categoryId,
+      payload: namedEntityCloudPayload(
+        id: categoryId,
+        organizationId: s.organizationId,
+        branchId: s.branchId,
+        name: '',
+        deleted: true,
+      ),
+    );
   }
 
   static const List<String> _defaultProductUnitNames = [
@@ -5026,6 +6007,17 @@ class AccountingService {
       throw Exception(_translateDbError(e));
     }
     await _audit('create', 'product_unit', id, 'Created unit $trimmed');
+    await _syncCatalogOutbox(
+      entityType: CatalogSyncConstants.entityTypeProductUnit,
+      operation: 'create',
+      entityId: id,
+      payload: namedEntityCloudPayload(
+        id: id,
+        organizationId: s.organizationId,
+        branchId: s.branchId,
+        name: trimmed,
+      ),
+    );
   }
 
   Future<void> updateProductUnitName({
@@ -5080,6 +6072,17 @@ class AccountingService {
       rethrow;
     }
     await _audit('update', 'product_unit', unitId, 'Renamed unit to $trimmed');
+    await _syncCatalogOutbox(
+      entityType: CatalogSyncConstants.entityTypeProductUnit,
+      operation: 'update',
+      entityId: unitId,
+      payload: namedEntityCloudPayload(
+        id: unitId,
+        organizationId: s.organizationId,
+        branchId: s.branchId,
+        name: trimmed,
+      ),
+    );
   }
 
   Future<void> deleteProductUnit(String unitId) async {
@@ -5116,6 +6119,331 @@ class AccountingService {
       }
     });
     await _audit('delete', 'product_unit', unitId, 'Deleted unit');
+    await _syncCatalogOutbox(
+      entityType: CatalogSyncConstants.entityTypeProductUnit,
+      operation: 'delete',
+      entityId: unitId,
+      payload: namedEntityCloudPayload(
+        id: unitId,
+        organizationId: s.organizationId,
+        branchId: s.branchId,
+        name: unitName,
+        deleted: true,
+      ),
+    );
+  }
+
+  Future<List<Map<String, Object?>>> listTaxes() async {
+    final s = _mustSession();
+    final db = await _databaseService.database;
+    return db.query(
+      'taxes',
+      where: 'organizationId = ? AND branchId = ?',
+      whereArgs: [s.organizationId, s.branchId],
+      orderBy: 'sortOrder, name COLLATE NOCASE',
+    );
+  }
+
+  Future<void> addTax({
+    required String name,
+    required double percent,
+    bool isDefault = false,
+    int sortOrder = 0,
+  }) async {
+    _requireManageProductsBasic();
+    _requireRegisteredOperationalAccess();
+    final s = _mustSession();
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) throw Exception('اسم الضريبة مطلوب.');
+    final db = await _databaseService.database;
+    final id = _uuid.v4();
+    await db.insert('taxes', {
+      'id': id,
+      'organizationId': s.organizationId,
+      'branchId': s.branchId,
+      'name': trimmed,
+      'percent': percent,
+      'isDefault': isDefault ? 1 : 0,
+      'sortOrder': sortOrder,
+      'createdAt': DateTime.now().toIso8601String(),
+    });
+    await _audit('create', 'tax', id, 'Created tax $trimmed');
+    await _syncCatalogOutbox(
+      entityType: CatalogSyncConstants.entityTypeTax,
+      operation: 'create',
+      entityId: id,
+      payload: taxEntityCloudPayload(
+        id: id,
+        organizationId: s.organizationId,
+        branchId: s.branchId,
+        name: trimmed,
+        percent: percent,
+        isDefault: isDefault,
+        sortOrder: sortOrder,
+      ),
+    );
+  }
+
+  Future<void> updateTax({
+    required String taxId,
+    required String name,
+    required double percent,
+    bool isDefault = false,
+    int sortOrder = 0,
+  }) async {
+    _requireManageProductsBasic();
+    _requireRegisteredOperationalAccess();
+    final s = _mustSession();
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) throw Exception('اسم الضريبة مطلوب.');
+    final db = await _databaseService.database;
+    final n = await db.update(
+      'taxes',
+      {
+        'name': trimmed,
+        'percent': percent,
+        'isDefault': isDefault ? 1 : 0,
+        'sortOrder': sortOrder,
+      },
+      where: 'id = ? AND organizationId = ? AND branchId = ?',
+      whereArgs: [taxId, s.organizationId, s.branchId],
+    );
+    if (n == 0) throw Exception('الضريبة غير موجودة.');
+    await _audit('update', 'tax', taxId, 'Updated tax $trimmed');
+    await _syncCatalogOutbox(
+      entityType: CatalogSyncConstants.entityTypeTax,
+      operation: 'update',
+      entityId: taxId,
+      payload: taxEntityCloudPayload(
+        id: taxId,
+        organizationId: s.organizationId,
+        branchId: s.branchId,
+        name: trimmed,
+        percent: percent,
+        isDefault: isDefault,
+        sortOrder: sortOrder,
+      ),
+    );
+  }
+
+  Future<void> deleteTax(String taxId) async {
+    _requireManageProductsBasic();
+    _requireRegisteredOperationalAccess();
+    final s = _mustSession();
+    final db = await _databaseService.database;
+    final n = await db.delete(
+      'taxes',
+      where: 'id = ? AND organizationId = ? AND branchId = ?',
+      whereArgs: [taxId, s.organizationId, s.branchId],
+    );
+    if (n == 0) throw Exception('الضريبة غير موجودة.');
+    await _audit('delete', 'tax', taxId, 'Deleted tax');
+    await _syncCatalogOutbox(
+      entityType: CatalogSyncConstants.entityTypeTax,
+      operation: 'delete',
+      entityId: taxId,
+      payload: taxEntityCloudPayload(
+        id: taxId,
+        organizationId: s.organizationId,
+        branchId: s.branchId,
+        name: '',
+        percent: 0,
+        deleted: true,
+      ),
+    );
+  }
+
+  Future<List<Map<String, Object?>>> listPriceLists() async {
+    final s = _mustSession();
+    final db = await _databaseService.database;
+    return db.query(
+      'price_lists',
+      where: 'organizationId = ? AND branchId = ?',
+      whereArgs: [s.organizationId, s.branchId],
+      orderBy: 'sortOrder, name COLLATE NOCASE',
+    );
+  }
+
+  Future<List<Map<String, Object?>>> listPriceListItems(String priceListId) async {
+    final s = _mustSession();
+    final db = await _databaseService.database;
+    return db.query(
+      'price_list_items',
+      where: 'organizationId = ? AND branchId = ? AND priceListId = ?',
+      whereArgs: [s.organizationId, s.branchId, priceListId],
+    );
+  }
+
+  Future<void> addPriceList({
+    required String name,
+    bool isDefault = false,
+    int sortOrder = 0,
+    List<Map<String, dynamic>> items = const [],
+  }) async {
+    _requireManageProductsBasic();
+    _requireRegisteredOperationalAccess();
+    final s = _mustSession();
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) throw Exception('اسم قائمة الأسعار مطلوب.');
+    final db = await _databaseService.database;
+    final id = _uuid.v4();
+    await db.transaction((txn) async {
+      await txn.insert('price_lists', {
+        'id': id,
+        'organizationId': s.organizationId,
+        'branchId': s.branchId,
+        'name': trimmed,
+        'isDefault': isDefault ? 1 : 0,
+        'sortOrder': sortOrder,
+        'createdAt': DateTime.now().toIso8601String(),
+      });
+      for (final item in items) {
+        final productId =
+            (item['productId'] ?? item['product_id'] ?? '').toString();
+        if (productId.isEmpty) continue;
+        await txn.insert('price_list_items', {
+          'id': _uuid.v4(),
+          'organizationId': s.organizationId,
+          'branchId': s.branchId,
+          'priceListId': id,
+          'productId': productId,
+          'salePrice': (item['salePrice'] as num?)?.toDouble() ??
+              (item['sale_price'] as num?)?.toDouble() ??
+              0,
+          'createdAt': DateTime.now().toIso8601String(),
+        });
+      }
+    });
+    await _audit('create', 'price_list', id, 'Created price list $trimmed');
+    await _syncPriceListOutbox(s, id, 'create');
+  }
+
+  Future<void> updatePriceList({
+    required String priceListId,
+    required String name,
+    bool isDefault = false,
+    int sortOrder = 0,
+    List<Map<String, dynamic>> items = const [],
+  }) async {
+    _requireManageProductsBasic();
+    _requireRegisteredOperationalAccess();
+    final s = _mustSession();
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) throw Exception('اسم قائمة الأسعار مطلوب.');
+    final db = await _databaseService.database;
+    await db.transaction((txn) async {
+      final n = await txn.update(
+        'price_lists',
+        {
+          'name': trimmed,
+          'isDefault': isDefault ? 1 : 0,
+          'sortOrder': sortOrder,
+        },
+        where: 'id = ? AND organizationId = ? AND branchId = ?',
+        whereArgs: [priceListId, s.organizationId, s.branchId],
+      );
+      if (n == 0) throw Exception('قائمة الأسعار غير موجودة.');
+      await txn.delete(
+        'price_list_items',
+        where: 'priceListId = ?',
+        whereArgs: [priceListId],
+      );
+      for (final item in items) {
+        final productId =
+            (item['productId'] ?? item['product_id'] ?? '').toString();
+        if (productId.isEmpty) continue;
+        await txn.insert('price_list_items', {
+          'id': _uuid.v4(),
+          'organizationId': s.organizationId,
+          'branchId': s.branchId,
+          'priceListId': priceListId,
+          'productId': productId,
+          'salePrice': (item['salePrice'] as num?)?.toDouble() ??
+              (item['sale_price'] as num?)?.toDouble() ??
+              0,
+          'createdAt': DateTime.now().toIso8601String(),
+        });
+      }
+    });
+    await _audit('update', 'price_list', priceListId, 'Updated price list $trimmed');
+    await _syncPriceListOutbox(s, priceListId, 'update');
+  }
+
+  Future<void> deletePriceList(String priceListId) async {
+    _requireManageProductsBasic();
+    _requireRegisteredOperationalAccess();
+    final s = _mustSession();
+    final db = await _databaseService.database;
+    await db.transaction((txn) async {
+      await txn.delete(
+        'price_list_items',
+        where: 'priceListId = ?',
+        whereArgs: [priceListId],
+      );
+      final n = await txn.delete(
+        'price_lists',
+        where: 'id = ? AND organizationId = ? AND branchId = ?',
+        whereArgs: [priceListId, s.organizationId, s.branchId],
+      );
+      if (n == 0) throw Exception('قائمة الأسعار غير موجودة.');
+    });
+    await _audit('delete', 'price_list', priceListId, 'Deleted price list');
+    await _syncCatalogOutbox(
+      entityType: CatalogSyncConstants.entityTypePriceList,
+      operation: 'delete',
+      entityId: priceListId,
+      payload: priceListEntityCloudPayload(
+        id: priceListId,
+        organizationId: s.organizationId,
+        branchId: s.branchId,
+        name: '',
+        deleted: true,
+      ),
+    );
+  }
+
+  Future<void> _syncPriceListOutbox(
+    AppUserSession s,
+    String priceListId,
+    String operation,
+  ) async {
+    final db = await _databaseService.database;
+    final header = await db.query(
+      'price_lists',
+      where: 'id = ?',
+      whereArgs: [priceListId],
+      limit: 1,
+    );
+    if (header.isEmpty) return;
+    final row = header.first;
+    final items = await db.query(
+      'price_list_items',
+      where: 'priceListId = ?',
+      whereArgs: [priceListId],
+    );
+    final cloudItems = items
+        .map(
+          (item) => {
+            'id': item['id'],
+            'product_id': item['productId'],
+            'sale_price': (item['salePrice'] as num?)?.toDouble() ?? 0,
+          },
+        )
+        .toList();
+    await _syncCatalogOutbox(
+      entityType: CatalogSyncConstants.entityTypePriceList,
+      operation: operation,
+      entityId: priceListId,
+      payload: priceListEntityCloudPayload(
+        id: priceListId,
+        organizationId: s.organizationId,
+        branchId: s.branchId,
+        name: (row['name'] ?? '').toString(),
+        isDefault: ((row['isDefault'] as num?) ?? 0) != 0,
+        sortOrder: (row['sortOrder'] as num?)?.toInt() ?? 0,
+        items: cloudItems,
+      ),
+    );
   }
 
   static String _duplicateBarcodeMessage() =>
@@ -5212,6 +6540,7 @@ class AccountingService {
       );
       final initialStockQty =
           (!product.isService && product.stockQty > 1e-9) ? 0.0 : product.stockQty;
+      var productInserted = false;
       await db.transaction((txn) async {
         await _requireCanAddCatalogProductInTxn(
           txn,
@@ -5240,19 +6569,40 @@ class AccountingService {
           'sortOrder': sortOrder,
           'createdAt': DateTime.now().toIso8601String(),
         });
+        productInserted = true;
       });
       if (!product.isService && product.stockQty > 1e-9) {
-        await createOpeningStock(
-          productId: product.id,
-          openingQuantity: product.stockQty,
-        );
+        try {
+          await createOpeningStock(
+            productId: product.id,
+            openingQuantity: product.stockQty,
+          );
+        } catch (e) {
+          if (productInserted) {
+            try {
+              await db.delete(
+                'products',
+                where: 'id = ? AND organizationId = ? AND branchId = ?',
+                whereArgs: [
+                  product.id,
+                  product.organizationId,
+                  product.branchId,
+                ],
+              );
+            } on Object {
+              /* best-effort rollback */
+            }
+          }
+          rethrow;
+        }
       }
     } on ProductCatalogTrialLimitException {
       rethrow;
     } catch (e) {
-      throw Exception(_translateDbError(e));
+      _rethrowCatalogPersistenceError(e);
     }
     await _audit('create', 'product', product.id, 'Created ${product.name}');
+    await _syncOutboxAfterProductChange('create', product.id, product: product);
   }
 
   Future<String> generateNextProductBarcode() async {
@@ -5682,6 +7032,7 @@ class AccountingService {
       productId,
       'Updated product details${wasService != nowService ? ' (service toggled)' : ''}',
     );
+    await _syncOutboxAfterProductChange('update', productId);
   }
 
   Future<void> setProductCategory({
@@ -5717,6 +7068,43 @@ class AccountingService {
     );
   }
 
+  static String productPermanentDeleteBlockedMessage(int refCount) =>
+      'لا يمكن حذف هذا المنتج نهائياً لأنه مرتبط بفواتير أو حركات مخزون ($refCount). '
+      'يمكنك نقله إلى سلة المحذوفات لإخفائه فقط.';
+
+  Map<String, Object?> _productTrashRowFromProduct(
+    Map<String, Object?> product,
+  ) {
+    const keys = [
+      'id',
+      'organizationId',
+      'branchId',
+      'name',
+      'salePrice',
+      'costPrice',
+      'stockQty',
+      'barcode',
+      'categoryId',
+      'description',
+      'unitName',
+      'imagePath',
+      'expiryDate',
+      'isHidden',
+      'isFrozen',
+      'isService',
+      'isFavorite',
+      'sortOrder',
+      'createdAt',
+    ];
+    final row = <String, Object?>{};
+    for (final k in keys) {
+      if (product.containsKey(k)) row[k] = product[k];
+    }
+    row.putIfAbsent('isFavorite', () => 0);
+    row['deletedAt'] = DateTime.now().toIso8601String();
+    return row;
+  }
+
   /// عدد السجلات المرتبطة بالمنتج في الفواتير والمخزون (يمنع الحذف النهائي).
   Future<int> productTransactionalReferenceCount(String productId) async {
     _requireDeleteProducts();
@@ -5742,10 +7130,7 @@ class AccountingService {
     final s = _mustSession();
     final refCount = await productTransactionalReferenceCount(productId);
     if (refCount > 0) {
-      throw Exception(
-        'لا يمكن حذف هذا المنتج نهائياً لأنه مرتبط بفواتير أو حركات مخزون ($refCount). '
-        'يمكنك نقله إلى سلة المحذوفات لإخفائه فقط.',
-      );
+      throw Exception(productPermanentDeleteBlockedMessage(refCount));
     }
     final db = await _databaseService.database;
     final active = await db.query(
@@ -5754,6 +7139,9 @@ class AccountingService {
       whereArgs: [productId, s.organizationId, s.branchId],
       limit: 1,
     );
+    final deleteSnapshot = active.isNotEmpty
+        ? Map<String, Object?>.from(active.first)
+        : null;
     final trashed = await db.query(
       'product_trash',
       where: 'id = ? AND organizationId = ? AND branchId = ?',
@@ -5774,9 +7162,16 @@ class AccountingService {
         await txn.delete('product_trash', where: 'id = ?', whereArgs: [productId]);
       });
     } catch (e) {
-      throw Exception(_translateDbError(e));
+      _rethrowCatalogPersistenceError(e);
     }
     await _audit('purge', 'product', productId, 'Permanently deleted product');
+    if (deleteSnapshot != null) {
+      await _syncOutboxAfterProductChange(
+        'delete',
+        productId,
+        deletedSnapshot: deleteSnapshot,
+      );
+    }
   }
 
   Future<Map<String, Object?>> deleteProduct(String productId) async {
@@ -5804,8 +7199,7 @@ class AccountingService {
       throw Exception('الصنف غير موجود.');
     }
     final snapshot = Map<String, Object?>.from(rows.first);
-    final trashRow = Map<String, Object?>.from(snapshot);
-    trashRow['deletedAt'] = DateTime.now().toIso8601String();
+    final trashRow = _productTrashRowFromProduct(snapshot);
     try {
       await db.transaction((txn) async {
         await txn.delete(
@@ -5817,9 +7211,14 @@ class AccountingService {
         await txn.delete('products', where: 'id = ?', whereArgs: [productId]);
       });
     } catch (e) {
-      throw Exception(_translateDbError(e));
+      _rethrowCatalogPersistenceError(e);
     }
     await _audit('delete', 'product', productId, 'Deleted product');
+    await _syncOutboxAfterProductChange(
+      'delete',
+      productId,
+      deletedSnapshot: snapshot,
+    );
     return snapshot;
   }
 
@@ -5862,7 +7261,7 @@ class AccountingService {
     } on ProductCatalogTrialLimitException {
       rethrow;
     } catch (e) {
-      throw Exception(_translateDbError(e));
+      _rethrowCatalogPersistenceError(e);
     }
     await _audit('restore', 'product', id, 'Restored product');
   }
@@ -6404,57 +7803,56 @@ class AccountingService {
         ? immediatePaidFromSplits(normalizedSplits)
         : (paidAmount ?? grandTotal).clamp(0.0, double.infinity);
     final nNotes = notes?.trim();
+    final syncLines =
+        <({String lineId, String productId, double quantity, double unitCost})>[];
+    for (final line in lines) {
+      syncLines.add((
+        lineId: _uuid.v4(),
+        productId: line.productId,
+        quantity: line.quantity,
+        unitCost: line.unitPrice,
+      ));
+    }
+
+    int? invoiceNumber;
     await db.transaction((txn) async {
-      final invoiceNumber = await _allocateInvoiceNumber(
+      invoiceNumber = await _allocateInvoiceNumber(
         txn,
         'purchaseInvoices',
         s.organizationId,
         s.branchId,
       );
-      await txn.insert('purchaseInvoices', {
-        'id': invoiceId,
-        'organizationId': s.organizationId,
-        'branchId': s.branchId,
-        'supplierId': supplierId,
-        'invoiceDate': now.toIso8601String(),
-        'total': grandTotal,
-        'paymentType': headerPay,
-        'invoiceStatus': 'posted',
-        'createdBy': s.userId,
-        'notes': (nNotes == null || nNotes.isEmpty) ? null : nNotes,
-        'discountAmount': disc,
-        'taxPercent': taxPercent,
-        'lineSubtotal': lineSubtotal,
-        'totalsFormat': 1,
-        'paidAmount': paid,
-        'invoiceNumber': invoiceNumber,
-      });
+    });
+
+    final postResult = await TransactionInvoiceSyncService(
+      databaseService: _databaseService,
+    ).createPurchaseDraftAndPost(
+      invoiceId: invoiceId,
+      organizationId: s.organizationId,
+      branchId: s.branchId,
+      userId: s.userId,
+      supplierId: supplierId,
+      invoiceDate: now,
+      paymentType: headerPay,
+      lineSubtotal: lineSubtotal,
+      discountAmount: disc,
+      taxPercent: taxPercent,
+      total: grandTotal,
+      paidAmount: paid,
+      notes: (nNotes == null || nNotes.isEmpty) ? null : nNotes,
+      invoiceNumber: invoiceNumber,
+      lines: syncLines,
+    );
+    if (!postResult.ok) {
+      throw Exception(transactionInvoicePostFailureMessage(postResult));
+    }
+
+    await db.transaction((txn) async {
       for (final line in lines) {
-        final lineId = _uuid.v4();
-        final lineTotal = line.quantity * line.unitPrice;
-        await txn.insert('purchaseInvoiceItems', {
-          'id': lineId,
-          'invoiceId': invoiceId,
-          'productId': line.productId,
-          'quantity': line.quantity,
-          'unitCost': line.unitPrice,
-          'lineTotal': lineTotal,
-        });
         await txn.rawUpdate(
-            'UPDATE products SET stockQty = stockQty + ?, costPrice = ? WHERE id = ?',
-            [line.quantity, line.unitPrice, line.productId]);
-        await txn.insert('stockMovements', {
-          'id': _uuid.v4(),
-          'organizationId': s.organizationId,
-          'branchId': s.branchId,
-          'productId': line.productId,
-          'movementType': 'in',
-          'quantity': line.quantity,
-          'referenceType': 'purchase',
-          'referenceId': invoiceId,
-          'movementDate': now.toIso8601String(),
-          'createdBy': s.userId,
-        });
+          'UPDATE products SET costPrice = ? WHERE id = ?',
+          [line.unitPrice, line.productId],
+        );
       }
       if (useSplits) {
         await _insertInvoicePaymentSplits(
@@ -6484,36 +7882,6 @@ class AccountingService {
           referenceType: 'purchase',
           referenceId: invoiceId,
         ));
-      }
-      final apRemaining =
-          AccountingService.invoiceRemainingForDisplay(
-        grandTotal: grandTotal,
-        paid: paid,
-      );
-      if (useSplits) {
-        await _postPartnerLedgerForInvoiceRemaining(
-          txn: txn,
-          isSale: false,
-          partnerId: supplierId,
-          invoiceId: invoiceId,
-          arRemaining: apRemaining,
-          entryDate: now,
-        );
-      } else if (MizaPaymentTypes.isDeferred(paymentType) &&
-          supplierId != null &&
-          supplierId.trim().isNotEmpty &&
-          apRemaining > 1e-9) {
-        await _insertPartnerLedger(
-          txn,
-          partnerKind: 'supplier',
-          partnerId: supplierId.trim(),
-          entryType: 'purchase_ap',
-          referenceType: 'purchase',
-          referenceId: invoiceId,
-          amountSigned: apRemaining,
-          notes: 'فاتورة شراء آجل',
-          entryDate: now,
-        );
       }
     });
     await _audit('create', 'purchaseInvoice', invoiceId, 'Created purchase invoice');
@@ -6957,11 +8325,162 @@ class AccountingService {
     List<InvoicePaymentSplitInput>? paymentSplits,
     bool Function(String paymentType)? cashBoxFilterForPaymentType,
     bool updateWarehouseStock = true,
+    String? priceListId,
   }) async {
     final s = _mustSession();
     if (!_isGuest) {
       _requireRegisteredOperationalAccess();
     }
+    // مسار ميداني خاص بدون مخزن المستودع — بدون مزامنة سحابية حالياً.
+    if (!updateWarehouseStock) {
+      return _createSaleLocalOnly(
+        customerId: customerId,
+        lines: lines,
+        paymentType: paymentType,
+        invoiceDate: invoiceDate,
+        discountAmount: discountAmount,
+        taxPercent: taxPercent,
+        notes: notes,
+        paidAmount: paidAmount,
+        recordCashBoxMovement: recordCashBoxMovement,
+        creditOverpayToCustomer: creditOverpayToCustomer,
+        paymentSplits: paymentSplits,
+        cashBoxFilterForPaymentType: cashBoxFilterForPaymentType,
+        updateWarehouseStock: false,
+        priceListId: priceListId,
+      );
+    }
+
+    final db = await _databaseService.database;
+    final invoiceId = _uuid.v4();
+    final now = invoiceDate ?? DateTime.now();
+    final am = AccountingService.computeInvoiceHeaderAmounts(
+      lines: lines,
+      discountAmount: discountAmount,
+      taxPercent: taxPercent,
+    );
+    final lineSubtotal = am['lineSubtotal']!;
+    final grandTotal = am['grandTotal']!;
+    final disc = am['discount']!;
+    final normalizedSplits =
+        paymentSplits != null ? normalizePaymentSplits(paymentSplits) : null;
+    final useSplits = normalizedSplits != null && normalizedSplits.isNotEmpty;
+    final headerPay = useSplits
+        ? headerPaymentTypeFromSplits(normalizedSplits)
+        : MizaPaymentTypes.normalize(paymentType);
+    final paid = useSplits
+        ? immediatePaidFromSplits(normalizedSplits)
+        : (paidAmount ?? grandTotal).clamp(0.0, double.infinity);
+    final nNotes = notes?.trim();
+    final syncLines =
+        <({String lineId, String productId, double quantity, double unitPrice})>[];
+    for (final line in lines) {
+      syncLines.add((
+        lineId: _uuid.v4(),
+        productId: line.productId,
+        quantity: line.quantity,
+        unitPrice: line.unitPrice,
+      ));
+    }
+
+    int? invoiceNumber;
+    await db.transaction((txn) async {
+      invoiceNumber = await _allocateInvoiceNumber(
+        txn,
+        'salesInvoices',
+        s.organizationId,
+        s.branchId,
+      );
+    });
+
+    final postResult = await TransactionInvoiceSyncService(
+      databaseService: _databaseService,
+    ).createSalesDraftAndPost(
+      invoiceId: invoiceId,
+      organizationId: s.organizationId,
+      branchId: s.branchId,
+      userId: s.userId,
+      customerId: customerId,
+      invoiceDate: now,
+      paymentType: headerPay,
+      lineSubtotal: lineSubtotal,
+      discountAmount: disc,
+      taxPercent: taxPercent,
+      total: grandTotal,
+      paidAmount: paid,
+      notes: (nNotes == null || nNotes.isEmpty) ? null : nNotes,
+      invoiceNumber: invoiceNumber,
+      lines: syncLines,
+      priceListId: priceListId,
+    );
+    if (!postResult.ok) {
+      throw Exception(transactionInvoicePostFailureMessage(postResult));
+    }
+
+    await db.transaction((txn) async {
+      if (useSplits) {
+        await _insertInvoicePaymentSplits(
+          txn,
+          invoiceKind: 'sale',
+          invoiceId: invoiceId,
+          organizationId: s.organizationId,
+          branchId: s.branchId,
+          splits: normalizedSplits,
+        );
+        await _postSplitCashMovements(
+          txn,
+          isSale: true,
+          invoiceId: invoiceId,
+          splits: normalizedSplits,
+          recordCashBoxMovement: recordCashBoxMovement,
+          cashBoxFilterForPaymentType: cashBoxFilterForPaymentType,
+          description: 'Sales invoice payment',
+        );
+      } else if (recordCashBoxMovement &&
+          MizaPaymentTypes.postsToCashBox(paymentType) &&
+          paid > 1e-9) {
+        await _insertCash(txn, CashTransactionInput(
+          type: 'in',
+          amount: paid,
+          description: 'Sales invoice payment',
+          referenceType: 'sale',
+          referenceId: invoiceId,
+        ));
+      }
+      if (!useSplits) {
+        await _insertSaleOverpayCreditIfNeeded(
+          txn,
+          customerId: customerId,
+          invoiceId: invoiceId,
+          grandTotal: grandTotal,
+          paid: paid,
+          creditOverpayToCustomer: creditOverpayToCustomer,
+          entryDate: now,
+        );
+      }
+    });
+    await _audit('create', 'salesInvoice', invoiceId, 'Created sales invoice');
+    return invoiceId;
+  }
+
+  /// إنشاء فاتورة بيع محلياً فقط (بدون outbox) — لاستخدامات خاصة مثل مخزن الشاحنة.
+  Future<String> _createSaleLocalOnly({
+    required String? customerId,
+    required List<InvoiceLineInput> lines,
+    String paymentType = 'cash',
+    DateTime? invoiceDate,
+    double discountAmount = 0,
+    double taxPercent = 0,
+    String? notes,
+    double? paidAmount,
+    bool recordCashBoxMovement = true,
+    bool creditOverpayToCustomer = false,
+    List<InvoicePaymentSplitInput>? paymentSplits,
+    bool Function(String paymentType)? cashBoxFilterForPaymentType,
+    bool updateWarehouseStock = true,
+    String? priceListId,
+  }) async {
+    final s = _mustSession();
     final db = await _databaseService.database;
     final invoiceId = _uuid.v4();
     final now = invoiceDate ?? DateTime.now();
@@ -7006,6 +8525,8 @@ class AccountingService {
         'lineSubtotal': lineSubtotal,
         'totalsFormat': 1,
         'paidAmount': paid,
+        if (priceListId != null && priceListId.isNotEmpty)
+          'priceListId': priceListId,
         'invoiceNumber': invoiceNumber,
       });
       for (final line in lines) {
@@ -7120,6 +8641,7 @@ class AccountingService {
     double discountAmount = 0,
     double taxPercent = 0,
     String? notes,
+    String? priceListId,
   }) async {
     final s = _mustSession();
     if (!_isGuest) {
@@ -7160,6 +8682,8 @@ class AccountingService {
         'lineSubtotal': lineSubtotal,
         'totalsFormat': 1,
         'paidAmount': 0,
+        if (priceListId != null && priceListId.isNotEmpty)
+          'priceListId': priceListId,
         'invoiceNumber': invoiceNumber,
       });
       for (final line in lines) {
@@ -7187,6 +8711,7 @@ class AccountingService {
     double discountAmount = 0,
     double taxPercent = 0,
     String? notes,
+    String? priceListId,
   }) async {
     _requireModifyInvoices();
     _requireRegisteredOperationalAccess();
@@ -7228,6 +8753,7 @@ class AccountingService {
           'customerId': customerId,
           'invoiceDate': now.toIso8601String(),
           'total': grandTotal,
+          'priceListId': priceListId,
           'invoiceStatus': 'quote',
           'notes': (nNotes == null || nNotes.isEmpty) ? null : nNotes,
           'discountAmount': disc,
@@ -7307,6 +8833,7 @@ class AccountingService {
       creditOverpayToCustomer: creditOverpayToCustomer,
       paymentSplits: paymentSplits,
       cashBoxFilterForPaymentType: cashBoxFilterForPaymentType,
+      priceListId: header['priceListId'] as String?,
     );
   }
 
@@ -7324,6 +8851,7 @@ class AccountingService {
     bool creditOverpayToCustomer = false,
     List<InvoicePaymentSplitInput>? paymentSplits,
     bool Function(String paymentType)? cashBoxFilterForPaymentType,
+    String? priceListId,
   }) async {
     _requireModifyInvoices();
     _requireRegisteredOperationalAccess();
@@ -7421,6 +8949,7 @@ class AccountingService {
           'lineSubtotal': lineSubtotal,
           'totalsFormat': 1,
           'paidAmount': paid,
+          'priceListId': priceListId,
         },
         where: 'id = ?',
         whereArgs: [invoiceId],
@@ -7743,6 +9272,7 @@ class AccountingService {
         await _insertCash(
           txn,
           CashTransactionInput(
+            id: SalesInvoicePostIds.voidCashTransactionId(invoiceId),
             type: 'out',
             amount: total,
             description: 'إلغاء فاتورة بيع نقدي',
@@ -7795,13 +9325,27 @@ class AccountingService {
           );
         }
       }
+      final nextTxn =
+          (((inv['transactionVersion'] as num?) ?? 1).toInt()) + 1;
+      final nextRow = (((inv['rowVersion'] as num?) ?? 2).toInt()) + 1;
       await txn.update(
         'salesInvoices',
-        {'invoiceStatus': 'voided'},
+        {
+          'invoiceStatus': 'voided',
+          'transactionVersion': nextTxn,
+          'rowVersion': nextRow,
+        },
         where: 'id = ?',
         whereArgs: [invoiceId],
       );
     });
+    await TransactionInvoiceVoidOutbox.enqueueSalesVoid(
+      databaseService: _databaseService,
+      invoiceId: invoiceId,
+      organizationId: s.organizationId,
+      branchId: s.branchId,
+      userId: s.userId,
+    );
     await _audit('void', 'salesInvoice', invoiceId, 'Voided sales invoice');
   }
 
@@ -7865,6 +9409,7 @@ class AccountingService {
         await _insertCash(
           txn,
           CashTransactionInput(
+            id: PurchaseInvoicePostIds.voidCashTransactionId(invoiceId),
             type: 'in',
             amount: total,
             description: 'إلغاء فاتورة شراء نقدي',
@@ -7887,13 +9432,27 @@ class AccountingService {
           );
         }
       }
+      final nextTxn =
+          (((inv['transactionVersion'] as num?) ?? 1).toInt()) + 1;
+      final nextRow = (((inv['rowVersion'] as num?) ?? 2).toInt()) + 1;
       await txn.update(
         'purchaseInvoices',
-        {'invoiceStatus': 'voided'},
+        {
+          'invoiceStatus': 'voided',
+          'transactionVersion': nextTxn,
+          'rowVersion': nextRow,
+        },
         where: 'id = ?',
         whereArgs: [invoiceId],
       );
     });
+    await TransactionInvoiceVoidOutbox.enqueuePurchaseVoid(
+      databaseService: _databaseService,
+      invoiceId: invoiceId,
+      organizationId: s.organizationId,
+      branchId: s.branchId,
+      userId: s.userId,
+    );
     await _audit('void', 'purchaseInvoice', invoiceId, 'Voided purchase invoice');
   }
 
@@ -7949,10 +9508,99 @@ class AccountingService {
     if (refund != 'cash' && refund != 'credit') {
       throw Exception('نوع الاسترداد غير صالح.');
     }
+
+    // مرتجع شاحنة/حقل بدون مخزن: يبقى محلياً كما كان (لا يدخل مزامنة الفواتير).
+    if (!updateWarehouseStock) {
+      return _createSaleReturnLocalOnly(
+        lines: lines,
+        customerId: customerId,
+        originalInvoiceId: originalInvoiceId,
+        refundPaymentType: refund,
+        returnDate: returnDate,
+        notes: notes,
+      );
+    }
+
+    final origSaleStored = () {
+      final t = originalInvoiceId?.trim();
+      return (t == null || t.isEmpty) ? null : t;
+    }();
+    if (origSaleStored == null) {
+      throw Exception('يجب تحديد الفاتورة الأصلية للمرتجع.');
+    }
     final db = await _databaseService.database;
     final returnId = _uuid.v4();
     final now = returnDate ?? DateTime.now();
     final total = lines.fold<double>(0, (sum, l) => sum + (l.quantity * l.unitPrice));
+
+    final syncLines =
+        <({String lineId, String productId, double quantity, double unitPrice})>[];
+    for (final line in lines) {
+      syncLines.add((
+        lineId: _uuid.v4(),
+        productId: line.productId,
+        quantity: line.quantity,
+        unitPrice: line.unitPrice,
+      ));
+    }
+
+    final postResult = await TransactionReturnSyncService(
+      databaseService: _databaseService,
+    ).createSalesReturnDraftAndPost(
+      returnId: returnId,
+      organizationId: s.organizationId,
+      branchId: s.branchId,
+      userId: s.userId,
+      customerId: customerId,
+      originalInvoiceId: origSaleStored,
+      returnDate: now,
+      refundPaymentType: refund,
+      lineSubtotal: total,
+      discountAmount: 0,
+      taxPercent: 0,
+      total: total,
+      paidAmount: total,
+      notes: notes.isEmpty ? null : notes,
+      lines: syncLines,
+    );
+    if (!postResult.ok) {
+      throw Exception(transactionReturnPostFailureMessage(postResult));
+    }
+
+    if (refund == 'cash' && total != 0) {
+      await db.transaction((txn) async {
+        await _insertCash(
+          txn,
+          CashTransactionInput(
+            type: 'out',
+            amount: total,
+            description: notes.isEmpty ? 'مرتجع بيع نقدي' : notes,
+            referenceType: 'sale_return',
+            referenceId: returnId,
+          ),
+        );
+      });
+    }
+
+    await _audit('create', 'sale_return', returnId, 'Sale return total $total');
+    return returnId;
+  }
+
+  /// مسار محلي لمرتجعات الحقل/الشاحنة (بدون تحديث مخزن الفرع).
+  Future<String> _createSaleReturnLocalOnly({
+    required List<InvoiceLineInput> lines,
+    String? customerId,
+    String? originalInvoiceId,
+    required String refundPaymentType,
+    DateTime? returnDate,
+    String notes = '',
+  }) async {
+    final s = _mustSession();
+    final db = await _databaseService.database;
+    final returnId = _uuid.v4();
+    final now = returnDate ?? DateTime.now();
+    final total = lines.fold<double>(0, (sum, l) => sum + (l.quantity * l.unitPrice));
+    final refund = refundPaymentType;
 
     await db.transaction((txn) async {
       final origSaleStored = () {
@@ -7983,24 +9631,6 @@ class AccountingService {
           'unitPrice': line.unitPrice,
           'lineTotal': lineTotal,
         });
-        if (updateWarehouseStock) {
-          await txn.rawUpdate(
-            'UPDATE products SET stockQty = stockQty + ? WHERE id = ?',
-            [line.quantity, line.productId],
-          );
-          await txn.insert('stockMovements', {
-            'id': _uuid.v4(),
-            'organizationId': s.organizationId,
-            'branchId': s.branchId,
-            'productId': line.productId,
-            'movementType': 'in',
-            'quantity': line.quantity,
-            'referenceType': 'sale_return',
-            'referenceId': returnId,
-            'movementDate': now.toIso8601String(),
-            'createdBy': s.userId,
-          });
-        }
       }
 
       final cid = customerId?.trim();
@@ -8073,94 +9703,54 @@ class AccountingService {
     if (refund != 'cash' && refund != 'credit') {
       throw Exception('نوع الاسترداد غير صالح.');
     }
+    final origPurStored = () {
+      final t = originalInvoiceId?.trim();
+      return (t == null || t.isEmpty) ? null : t;
+    }();
+    if (origPurStored == null) {
+      throw Exception('يجب تحديد الفاتورة الأصلية للمرتجع.');
+    }
     final db = await _databaseService.database;
     final returnId = _uuid.v4();
     final now = returnDate ?? DateTime.now();
     final total = lines.fold<double>(0, (sum, l) => sum + (l.quantity * l.unitPrice));
 
-    await db.transaction((txn) async {
-      final origPurStored = () {
-        final t = originalInvoiceId?.trim();
-        return (t == null || t.isEmpty) ? null : t;
-      }();
-      await txn.insert('purchaseReturns', {
-        'id': returnId,
-        'organizationId': s.organizationId,
-        'branchId': s.branchId,
-        'supplierId': supplierId,
-        'originalInvoiceId': origPurStored,
-        'returnDate': now.toIso8601String(),
-        'total': total,
-        'refundPaymentType': refund,
-        'notes': notes,
-        'createdBy': s.userId,
-        'returnStatus': 'posted',
-      });
-      for (final line in lines) {
-        final lineId = _uuid.v4();
-        final lineTotal = line.quantity * line.unitPrice;
-        await txn.insert('purchaseReturnItems', {
-          'id': lineId,
-          'returnId': returnId,
-          'productId': line.productId,
-          'quantity': line.quantity,
-          'unitCost': line.unitPrice,
-          'lineTotal': lineTotal,
-        });
-        await txn.rawUpdate(
-          'UPDATE products SET stockQty = stockQty - ? WHERE id = ?',
-          [line.quantity, line.productId],
-        );
-        await txn.insert('stockMovements', {
-          'id': _uuid.v4(),
-          'organizationId': s.organizationId,
-          'branchId': s.branchId,
-          'productId': line.productId,
-          'movementType': 'out',
-          'quantity': line.quantity,
-          'referenceType': 'purchase_return',
-          'referenceId': returnId,
-          'movementDate': now.toIso8601String(),
-          'createdBy': s.userId,
-        });
-      }
+    final syncLines =
+        <({String lineId, String productId, double quantity, double unitCost})>[];
+    for (final line in lines) {
+      syncLines.add((
+        lineId: _uuid.v4(),
+        productId: line.productId,
+        quantity: line.quantity,
+        unitCost: line.unitPrice,
+      ));
+    }
 
-      final sid = supplierId?.trim();
-      var ledgerAdj = false;
-      if (sid != null && sid.isNotEmpty) {
-        if (refund == 'credit') {
-          ledgerAdj = true;
-        } else if (refund == 'cash') {
-          if (origPurStored != null) {
-            final orig = await txn.query(
-              'purchaseInvoices',
-              columns: ['paymentType'],
-              where: 'id = ? AND organizationId = ? AND branchId = ?',
-              whereArgs: [origPurStored, s.organizationId, s.branchId],
-              limit: 1,
-            );
-            if (orig.isNotEmpty &&
-                MizaPaymentTypes.isDeferred(
-                    (orig.first['paymentType'] ?? '').toString())) {
-              ledgerAdj = true;
-            }
-          }
-        }
-      }
-      if (ledgerAdj && sid != null && sid.isNotEmpty && total != 0) {
-        await _insertPartnerLedger(
-          txn,
-          partnerKind: 'supplier',
-          partnerId: sid,
-          entryType: 'purchase_return',
-          referenceType: 'purchase_return',
-          referenceId: returnId,
-          amountSigned: -total,
-          notes: notes.isEmpty ? 'مرتجع شراء' : notes,
-          entryDate: now,
-        );
-      }
-      if (refund == 'cash' && total != 0) {
+    final postResult = await TransactionReturnSyncService(
+      databaseService: _databaseService,
+    ).createPurchaseReturnDraftAndPost(
+      returnId: returnId,
+      organizationId: s.organizationId,
+      branchId: s.branchId,
+      userId: s.userId,
+      supplierId: supplierId,
+      originalInvoiceId: origPurStored,
+      returnDate: now,
+      refundPaymentType: refund,
+      lineSubtotal: total,
+      discountAmount: 0,
+      taxPercent: 0,
+      total: total,
+      paidAmount: total,
+      notes: notes.isEmpty ? null : notes,
+      lines: syncLines,
+    );
+    if (!postResult.ok) {
+      throw Exception(transactionReturnPostFailureMessage(postResult));
+    }
+
+    if (refund == 'cash' && total != 0) {
+      await db.transaction((txn) async {
         await _insertCash(
           txn,
           CashTransactionInput(
@@ -8171,8 +9761,9 @@ class AccountingService {
             referenceId: returnId,
           ),
         );
-      }
-    });
+      });
+    }
+
     await _audit('create', 'purchase_return', returnId, 'Purchase return total $total');
     return returnId;
   }
@@ -8801,6 +10392,21 @@ class AccountingService {
       }
     });
     await _audit('create', 'expense', expenseId, 'Created expense $title');
+    await _syncCatalogOutbox(
+      entityType: ExpenseSyncConstants.entityType,
+      operation: 'create',
+      entityId: expenseId,
+      payload: expenseEntityCloudPayload(
+        id: expenseId,
+        organizationId: s.organizationId,
+        branchId: s.branchId,
+        title: title,
+        amount: amount,
+        expenseDate: now,
+        createdByUserId: s.userId,
+        notes: notes,
+      ),
+    );
   }
 
   Future<void> addCashTransaction(CashTransactionInput input) async {
@@ -8814,15 +10420,16 @@ class AccountingService {
   }
 
   /// قبض من عميل مع خصم الذمة في دفتر الشركاء (يُستخدم للتسديد الحقيقي للآجل).
-  Future<void> recordCustomerPayment({
+  Future<String> recordCustomerPayment({
     required String customerId,
     required double amount,
     String notes = '',
     DateTime? paymentDate,
     String? voucherNumber,
+    String paymentMethod = 'cash',
   }) async {
-    _mustSession();
     _requirePaidSubscription();
+    final s = _mustSession();
     final cid = customerId.trim();
     if (cid.isEmpty) {
       throw Exception('معرف العميل غير صالح.');
@@ -8831,45 +10438,39 @@ class AccountingService {
       throw Exception('المبلغ يجب أن يكون أكبر من صفر.');
     }
     final paymentId = _uuid.v4();
-    final db = await _databaseService.database;
     final when = paymentDate ?? DateTime.now();
-    await db.transaction((txn) async {
-      await _insertCash(
-        txn,
-        CashTransactionInput(
-          type: 'in',
-          amount: amount,
-          description: notes.isEmpty ? 'تسديد دين عميل' : notes,
-          referenceType: 'customer_payment',
-          referenceId: paymentId,
-        ),
-      );
-      await _insertPartnerLedger(
-        txn,
-        partnerKind: 'customer',
-        partnerId: cid,
-        entryType: 'customer_payment',
-        referenceType: 'customer_payment',
-        referenceId: paymentId,
-        amountSigned: -amount,
-        notes: notes.isEmpty ? 'دفعة عميل' : notes,
-        entryDate: when,
-        voucherNumber: voucherNumber,
-      );
-    });
+    final postResult = await TransactionPaymentSyncService(
+      databaseService: _databaseService,
+    ).createCustomerPaymentDraftAndPost(
+      paymentId: paymentId,
+      organizationId: s.organizationId,
+      branchId: s.branchId,
+      userId: s.userId,
+      customerId: cid,
+      amount: amount,
+      paymentDate: when,
+      paymentMethod: paymentMethod,
+      voucherNumber: voucherNumber,
+      notes: notes.isEmpty ? null : notes,
+    );
+    if (!postResult.ok) {
+      throw Exception(transactionPaymentPostFailureMessage(postResult));
+    }
     await _audit('create', 'customer_payment', paymentId, 'Customer payment $amount');
+    return paymentId;
   }
 
   /// صرف لمورد مع خصم ذمة المورد في دفتر الشركاء.
-  Future<void> recordSupplierPayment({
+  Future<String> recordSupplierPayment({
     required String supplierId,
     required double amount,
     String notes = '',
     DateTime? paymentDate,
     String? voucherNumber,
+    String paymentMethod = 'cash',
   }) async {
-    _mustSession();
     _requirePaidSubscription();
+    final s = _mustSession();
     final sid = supplierId.trim();
     if (sid.isEmpty) {
       throw Exception('معرف المورد غير صالح.');
@@ -8878,33 +10479,26 @@ class AccountingService {
       throw Exception('المبلغ يجب أن يكون أكبر من صفر.');
     }
     final paymentId = _uuid.v4();
-    final db = await _databaseService.database;
     final when = paymentDate ?? DateTime.now();
-    await db.transaction((txn) async {
-      await _insertCash(
-        txn,
-        CashTransactionInput(
-          type: 'out',
-          amount: amount,
-          description: notes.isEmpty ? 'سداد ذمة مورد' : notes,
-          referenceType: 'supplier_payment',
-          referenceId: paymentId,
-        ),
-      );
-      await _insertPartnerLedger(
-        txn,
-        partnerKind: 'supplier',
-        partnerId: sid,
-        entryType: 'supplier_payment',
-        referenceType: 'supplier_payment',
-        referenceId: paymentId,
-        amountSigned: -amount,
-        notes: notes.isEmpty ? 'دفعة مورد' : notes,
-        entryDate: when,
-        voucherNumber: voucherNumber,
-      );
-    });
+    final postResult = await TransactionPaymentSyncService(
+      databaseService: _databaseService,
+    ).createSupplierPaymentDraftAndPost(
+      paymentId: paymentId,
+      organizationId: s.organizationId,
+      branchId: s.branchId,
+      userId: s.userId,
+      supplierId: sid,
+      amount: amount,
+      paymentDate: when,
+      paymentMethod: paymentMethod,
+      voucherNumber: voucherNumber,
+      notes: notes.isEmpty ? null : notes,
+    );
+    if (!postResult.ok) {
+      throw Exception(transactionPaymentPostFailureMessage(postResult));
+    }
     await _audit('create', 'supplier_payment', paymentId, 'Supplier payment $amount');
+    return paymentId;
   }
 
   Future<bool> cancelLastManualCashTransactionByType(String type) async {
@@ -10354,6 +11948,7 @@ class AccountingService {
     final path =
         filePath ?? join(appDataDirectoryPath(), 'backup_$now.json');
     await File(path).writeAsString(const JsonEncoder.withIndent('  ').convert(payload));
+    await ProductImageStorage.exportForBackup(path);
     await _audit('backup', 'system', now, 'Backup created at $path');
     return path;
   }
@@ -10362,7 +11957,14 @@ class AccountingService {
     _mustSession();
     _requirePremiumCommercialFeatures();
     final db = await _databaseService.database;
-    final file = File(filePath);
+
+    var jsonPath = filePath;
+    final lower = filePath.toLowerCase();
+    if (lower.endsWith('.zip')) {
+      jsonPath = await ProductImageStorage.prepareRestoreFromZip(filePath);
+    }
+
+    final file = File(jsonPath);
     if (!await file.exists()) {
       throw Exception('Backup file not found');
     }
@@ -10401,6 +12003,9 @@ class AccountingService {
         }
       }
     });
+    if (!lower.endsWith('.zip')) {
+      await ProductImageStorage.importFromBackup(jsonPath);
+    }
   }
 
   Future<void> _insertPartnerLedger(
@@ -10437,8 +12042,22 @@ class AccountingService {
 
   Future<void> _insertCash(dynamic txn, CashTransactionInput input) async {
     final s = _mustSession();
+    final id = (input.id?.trim().isNotEmpty ?? false) ? input.id!.trim() : _uuid.v4();
+    final when = DateTime.now().toIso8601String();
+    if (input.id != null && input.id!.trim().isNotEmpty) {
+      final existing = await txn.query(
+        'cashTransactions',
+        columns: const ['id'],
+        where: 'id = ?',
+        whereArgs: [id],
+        limit: 1,
+      );
+      if (existing.isNotEmpty) {
+        return;
+      }
+    }
     await txn.insert('cashTransactions', {
-      'id': _uuid.v4(),
+      'id': id,
       'organizationId': s.organizationId,
       'branchId': s.branchId,
       'transactionType': input.type,
@@ -10446,9 +12065,59 @@ class AccountingService {
       'description': input.description,
       'referenceType': input.referenceType,
       'referenceId': input.referenceId,
-      'transactionDate': DateTime.now().toIso8601String(),
+      'transactionDate': when,
       'createdBy': s.userId,
     });
+    await _enqueueCashOutboxIfNeeded(
+      txn: txn,
+      id: id,
+      organizationId: s.organizationId,
+      branchId: s.branchId,
+      input: input,
+      transactionDate: when,
+      createdBy: s.userId,
+    );
+  }
+
+  Future<void> _enqueueCashOutboxIfNeeded({
+    required dynamic txn,
+    required String id,
+    required String organizationId,
+    required String branchId,
+    required CashTransactionInput input,
+    required String transactionDate,
+    required String createdBy,
+  }) async {
+    final refType = input.referenceType.trim().toLowerCase();
+    if (CashSyncConstants.paymentSyncedReferenceTypes.contains(refType)) {
+      return;
+    }
+    try {
+      await CatalogSyncOutboxWriter.record(
+        entityType: CashSyncConstants.entityType,
+        operation: 'create',
+        entityId: id,
+        organizationId: organizationId,
+        branchId: branchId,
+        payload: cashEntityCloudPayload(
+          id: id,
+          organizationId: organizationId,
+          branchId: branchId,
+          transactionType: input.type,
+          amount: input.amount,
+          description: input.description,
+          referenceType: input.referenceType,
+          referenceId: input.referenceId,
+          transactionDate: transactionDate,
+          createdByUserId: createdBy,
+        ),
+        databaseService: _databaseService,
+        storage: CatalogSyncOutboxWriter.storage,
+        executor: txn is DatabaseExecutor ? txn : null,
+      );
+    } on Object {
+      // لا نعطل المحاسبة إذا فشل outbox
+    }
   }
 
   Future<void> _audit(
@@ -10478,6 +12147,126 @@ class AccountingService {
       throw Exception('Not authenticated');
     }
     return value;
+  }
+
+  /// بعد commit ناجح — تسجيل catalog/partner في sync_outbox (بدون push).
+  Future<void> _syncCatalogOutbox({
+    required String entityType,
+    required String operation,
+    required String entityId,
+    required Map<String, dynamic> payload,
+  }) async {
+    final s = _session;
+    if (s == null) return;
+    try {
+      if (PartnerSyncOutboxWriter.isPartnerEntityType(entityType)) {
+        await PartnerSyncOutboxWriter.record(
+          entityType: entityType,
+          operation: operation,
+          entityId: entityId,
+          organizationId: s.organizationId,
+          branchId: s.branchId,
+          payload: payload,
+          databaseService: _databaseService,
+          storage: PartnerSyncOutboxWriter.storage ??
+              CatalogSyncOutboxWriter.storage,
+        );
+        return;
+      }
+      if (CategorySyncOutboxWriter.isCategoryEntityType(entityType)) {
+        await CategorySyncOutboxWriter.record(
+          entityType: entityType,
+          operation: operation,
+          entityId: entityId,
+          organizationId: s.organizationId,
+          branchId: s.branchId,
+          payload: payload,
+          databaseService: _databaseService,
+          storage: CategorySyncOutboxWriter.storage ??
+              CatalogSyncOutboxWriter.storage,
+        );
+        return;
+      }
+      if (UnitSyncOutboxWriter.isUnitEntityType(entityType)) {
+        await UnitSyncOutboxWriter.record(
+          entityType: entityType,
+          operation: operation,
+          entityId: entityId,
+          organizationId: s.organizationId,
+          branchId: s.branchId,
+          payload: payload,
+          databaseService: _databaseService,
+          storage: UnitSyncOutboxWriter.storage ??
+              CatalogSyncOutboxWriter.storage,
+        );
+        return;
+      }
+      if (TaxSyncOutboxWriter.isTaxEntityType(entityType)) {
+        await TaxSyncOutboxWriter.record(
+          entityType: entityType,
+          operation: operation,
+          entityId: entityId,
+          organizationId: s.organizationId,
+          branchId: s.branchId,
+          payload: payload,
+          databaseService: _databaseService,
+          storage: TaxSyncOutboxWriter.storage ??
+              CatalogSyncOutboxWriter.storage,
+        );
+        return;
+      }
+      if (PriceListSyncOutboxWriter.isPriceListEntityType(entityType)) {
+        await PriceListSyncOutboxWriter.record(
+          entityType: entityType,
+          operation: operation,
+          entityId: entityId,
+          organizationId: s.organizationId,
+          branchId: s.branchId,
+          payload: payload,
+          databaseService: _databaseService,
+          storage: PriceListSyncOutboxWriter.storage ??
+              CatalogSyncOutboxWriter.storage,
+        );
+        return;
+      }
+      await CatalogSyncOutboxWriter.record(
+        entityType: entityType,
+        operation: operation,
+        entityId: entityId,
+        organizationId: s.organizationId,
+        branchId: s.branchId,
+        payload: payload,
+        databaseService: _databaseService,
+        storage: CatalogSyncOutboxWriter.storage,
+      );
+    } on Object {
+      // لا نعطل المحاسبة إذا فشل outbox
+    }
+  }
+
+  /// بعد commit ناجح — تسجيل product في sync_outbox (بدون push).
+  Future<void> _syncOutboxAfterProductChange(
+    String operation,
+    String productId, {
+    ProductEntity? product,
+    Map<String, Object?>? deletedSnapshot,
+  }) async {
+    final s = _session;
+    if (s == null) return;
+    try {
+      await ProductSyncOutboxWriter.record(
+        operation: operation,
+        productId: productId,
+        organizationId: s.organizationId,
+        branchId: s.branchId,
+        product: product,
+        deletedSnapshot: deletedSnapshot,
+        databaseService: _databaseService,
+        storage: ProductSyncOutboxWriter.storage,
+      );
+    } on Object {
+      // لا نعطل المحاسبة إذا فشل outbox
+    }
   }
 
   Future<void> _deleteByIds(
@@ -11674,8 +13463,26 @@ class AccountingService {
         .toList();
   }
 
+  bool _looksLikeSqliteError(Object error) {
+    final message = error.toString();
+    return error is DatabaseException ||
+        message.contains('DatabaseException') ||
+        message.contains('SqliteException') ||
+        message.contains('SqfliteFfiException') ||
+        message.contains('UNIQUE constraint failed') ||
+        message.contains('NOT NULL constraint failed') ||
+        message.contains('FOREIGN KEY constraint failed');
+  }
+
+  Never _rethrowCatalogPersistenceError(Object error) {
+    if (error is Exception && !_looksLikeSqliteError(error)) {
+      throw error;
+    }
+    throw Exception(_translateDbError(error));
+  }
+
   String _translateDbError(Object error) {
-    if (error is! DatabaseException) {
+    if (!_looksLikeSqliteError(error)) {
       return 'حدث خطأ غير متوقع أثناء الحفظ.';
     }
     final message = error.toString();
@@ -11686,6 +13493,10 @@ class AccountingService {
       return 'اسم الدخول محجوز مسبقاً.';
     }
     if (message.contains('uq_products_scope_name_nocase')) {
+      return 'اسم الصنف موجود بالفعل.';
+    }
+    if (message.contains('products.organizationId') &&
+        message.contains('products.name')) {
       return 'اسم الصنف موجود بالفعل.';
     }
     if (message.contains('uq_product_categories_scope_name_nocase')) {

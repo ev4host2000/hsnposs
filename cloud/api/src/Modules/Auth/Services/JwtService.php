@@ -58,6 +58,70 @@ final class JwtService
         ];
     }
 
+    /**
+     * @param list<string> $scopes
+     * @return array{token: string, jti: string, expires_at: string, expires_in: int}
+     */
+    public function issuePlatformAdminToken(array $scopes, int $ttlSeconds): array
+    {
+        $issuedAt = time();
+        $expiresIn = max(60, $ttlSeconds);
+        $jti = \MizaCloud\Modules\Auth\Support\Uuid::v4();
+
+        $claims = [
+            'iss' => $this->issuer,
+            'sub' => 'platform_admin',
+            'jti' => $jti,
+            'iat' => $issuedAt,
+            'exp' => $issuedAt + $expiresIn,
+            'token_type' => 'platform_admin',
+            'scopes' => array_values($scopes),
+        ];
+
+        return [
+            'token' => $this->encode($claims),
+            'jti' => $jti,
+            'expires_at' => gmdate('Y-m-d\TH:i:s.v\Z', $claims['exp']),
+            'expires_in' => $expiresIn,
+        ];
+    }
+
+    /**
+     * @param list<string> $scopes
+     * @return array{token: string, jti: string, expires_at: string, expires_in: int}
+     */
+    public function issueOwnerPortalToken(
+        string $userId,
+        string $companyId,
+        string $branchId,
+        array $scopes,
+        int $ttlSeconds,
+    ): array {
+        $issuedAt = time();
+        $expiresIn = max(300, $ttlSeconds);
+        $jti = \MizaCloud\Modules\Auth\Support\Uuid::v4();
+
+        $claims = [
+            'iss' => $this->issuer,
+            'sub' => $userId,
+            'jti' => $jti,
+            'iat' => $issuedAt,
+            'exp' => $issuedAt + $expiresIn,
+            'token_type' => 'owner_portal',
+            'company_id' => $companyId,
+            'branch_id' => $branchId,
+            'device_id' => '',
+            'scopes' => array_values($scopes),
+        ];
+
+        return [
+            'token' => $this->encode($claims),
+            'jti' => $jti,
+            'expires_at' => gmdate('Y-m-d\TH:i:s.v\Z', $claims['exp']),
+            'expires_in' => $expiresIn,
+        ];
+    }
+
     /** @return array<string, mixed> */
     public function decode(string $token): array
     {

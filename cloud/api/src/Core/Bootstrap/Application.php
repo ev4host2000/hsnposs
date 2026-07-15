@@ -16,6 +16,7 @@ use MizaCloud\Core\Logging\Logger;
 use MizaCloud\Core\Middleware\CorsMiddleware;
 use MizaCloud\Core\Middleware\JwtMiddleware;
 use MizaCloud\Core\Middleware\MiddlewarePipeline;
+use MizaCloud\Core\Middleware\RateLimitMiddleware;
 use MizaCloud\Core\Middleware\RequestIdMiddleware;
 use MizaCloud\Core\Modules\ModuleRegistry;
 use MizaCloud\Core\Router\Router;
@@ -73,12 +74,46 @@ final class Application
         $container->instance(Router::class, $router);
 
         $pipeline = new MiddlewarePipeline();
+
+        $corsConfig = $config->get('cors', []);
+        if (!is_array($corsConfig)) {
+            $corsConfig = [];
+        }
+
+        $rateLimitConfig = $config->get('rate_limit', []);
+        if (!is_array($rateLimitConfig)) {
+            $rateLimitConfig = [];
+        }
+
         $pipeline->add(new RequestIdMiddleware());
-        $pipeline->add(new CorsMiddleware());
+        $pipeline->add(new CorsMiddleware(
+            allowedOrigins: $corsConfig['allowed_origins'] ?? ['*'],
+            allowedMethods: $corsConfig['allowed_methods'] ?? ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+            allowedHeaders: $corsConfig['allowed_headers'] ?? ['Authorization', 'Content-Type', 'Accept'],
+            maxAge: (int) ($corsConfig['max_age'] ?? 86400),
+            allowCredentials: (bool) ($corsConfig['allow_credentials'] ?? false),
+        ));
+        $pipeline->add(new RateLimitMiddleware(
+            enabled: (bool) ($rateLimitConfig['enabled'] ?? true),
+            maxAttempts: (int) ($rateLimitConfig['login_max_attempts'] ?? 10),
+            windowSeconds: (int) ($rateLimitConfig['login_window_seconds'] ?? 60),
+            storagePath: $basePath . '/' . ($rateLimitConfig['storage_path'] ?? 'storage/rate_limit'),
+            trustProxy: (bool) ($rateLimitConfig['trust_proxy'] ?? true),
+            trustedProxies: is_array($rateLimitConfig['trusted_proxies'] ?? null)
+                ? array_values(array_filter(array_map('strval', $rateLimitConfig['trusted_proxies'])))
+                : ['127.0.0.1', '::1', '10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16'],
+            forgotMaxAttempts: (int) ($rateLimitConfig['forgot_max_attempts'] ?? 5),
+            forgotWindowSeconds: (int) ($rateLimitConfig['forgot_window_seconds'] ?? 300),
+        ));
         $pipeline->add(new JwtMiddleware($jwtConfig, required: false));
 
         ModuleRegistry::registerAll($container, $router);
         $router->setContainer($container);
+
+        // Eager-init Ops Audit writer so Auth/Sync can emit events without Admin first hit
+        if ($container->has(\MizaCloud\Modules\Admin\Services\OpsAuditWriter::class)) {
+            $container->get(\MizaCloud\Modules\Admin\Services\OpsAuditWriter::class);
+        }
 
         $apiRoutes = $basePath . '/routes/api.php';
         if (is_file($apiRoutes)) {

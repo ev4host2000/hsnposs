@@ -16,6 +16,7 @@ class HttpException extends Exception
         string $message,
         public readonly int $statusCode = 400,
         public readonly array $details = [],
+        public readonly mixed $data = null,
         ?Exception $previous = null,
     ) {
         parent::__construct($message, $statusCode, $previous);

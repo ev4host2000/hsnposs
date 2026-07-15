@@ -22,8 +22,13 @@ final class TaxesPushValidator extends CatalogNamedEntityPushValidator
         if ($payload === null) {
             return [];
         }
-        if (!isset($payload['percent']) || !is_numeric($payload['percent'])) {
-            return ["{$prefix}.payload_json.percent:Tax percent is required"];
+        // Tax nature: percent must be numeric when present.
+        // Native patch may omit unchanged percent (Update Contract v2).
+        if (!array_key_exists('percent', $payload)) {
+            return [];
+        }
+        if (!is_numeric($payload['percent'])) {
+            return ["{$prefix}.payload_json.percent:Tax percent must be numeric"];
         }
 
         return [];

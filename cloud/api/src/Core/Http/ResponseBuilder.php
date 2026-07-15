@@ -26,6 +26,7 @@ final class ResponseBuilder
         string $message,
         int $status = 400,
         array $details = [],
+        mixed $data = null,
     ): Response {
         $error = [
             'code' => $code,
@@ -35,10 +36,14 @@ final class ResponseBuilder
         if ($details !== []) {
             $error['details'] = $details;
         }
-        return $this->json([
+        $payload = [
             'ok' => false,
             'error' => $error,
-        ], $status);
+        ];
+        if ($data !== null) {
+            $payload['data'] = $data;
+        }
+        return $this->json($payload, $status);
     }
 
     public function json(array $payload, int $status = 200): Response

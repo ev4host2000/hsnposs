@@ -73,6 +73,33 @@ class TransactionSyncOutboxWriter {
     );
   }
 
+  /// يحاول تسجيل الحدث في outbox دون إفشال مسار الترحيل المحلي.
+  static Future<void> recordBestEffort({
+    required String entityType,
+    required String operation,
+    required String entityId,
+    required String organizationId,
+    required String branchId,
+    required Map<String, dynamic> payload,
+    DatabaseService? databaseService,
+    CloudSecureStorage? storage,
+  }) async {
+    try {
+      await record(
+        entityType: entityType,
+        operation: operation,
+        entityId: entityId,
+        organizationId: organizationId,
+        branchId: branchId,
+        payload: payload,
+        databaseService: databaseService,
+        storage: storage,
+      );
+    } on Object {
+      // لا يُلغى ترحيل المخزون المحلي عند تعذّر طابور المزامنة.
+    }
+  }
+
   static Future<String> _resolveDeviceId(
     Database db,
     CloudSecureStorage? storage,
@@ -98,15 +125,17 @@ class TransactionSyncOutboxWriter {
     return installationId;
   }
 
-  /// Post uses a stable key so replay push does not create duplicate changelog entries.
+  /// Create/post/void use stable keys so replay push does not create duplicate changelog entries.
   static String _idempotencyKey({
     required String deviceId,
     required String entityId,
     required String operation,
     required String outboxId,
   }) {
-    if (operation == 'post') {
-      return '$deviceId:$entityId:post';
+    if (operation == 'create' ||
+        operation == 'post' ||
+        operation == 'void') {
+      return '$deviceId:$entityId:$operation';
     }
     return '$deviceId:$entityId:$operation:$outboxId';
   }

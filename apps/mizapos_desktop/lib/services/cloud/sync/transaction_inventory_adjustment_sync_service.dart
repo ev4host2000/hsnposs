@@ -83,7 +83,7 @@ class TransactionInventoryAdjustmentSyncService {
       notes: notes,
     );
 
-    await TransactionSyncOutboxWriter.record(
+    await TransactionSyncOutboxWriter.recordBestEffort(
       entityType: InventoryAdjustmentSyncConstants.entityType,
       operation: 'create',
       entityId: adjustmentId,

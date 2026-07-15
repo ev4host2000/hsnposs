@@ -9,4 +9,6 @@ return [
     'url' => $_ENV['APP_URL'] ?? 'https://api.mizapos.com',
     'timezone' => $_ENV['APP_TIMEZONE'] ?? 'UTC',
     'api_version' => 'v1',
+    // RAP-P1-06: when set, X-Health-Token unlocks detailed health/version/database fields.
+    'health_detail_token' => (string) ($_ENV['HEALTH_DETAIL_TOKEN'] ?? ''),
 ];

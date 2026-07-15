@@ -33,6 +33,34 @@ final class RequestFactory
             headers: $headers,
             query: $_GET,
             body: $body,
+            files: self::normalizeFiles(),
         );
+    }
+
+    /** @return array<string, array{name: string, tmp_name: string, size: int, error: int, type: string}> */
+    private static function normalizeFiles(): array
+    {
+        if (empty($_FILES)) {
+            return [];
+        }
+
+        $files = [];
+        foreach ($_FILES as $field => $file) {
+            if (!is_array($file)) {
+                continue;
+            }
+            if (is_array($file['name'] ?? null)) {
+                continue;
+            }
+            $files[(string) $field] = [
+                'name' => (string) ($file['name'] ?? ''),
+                'tmp_name' => (string) ($file['tmp_name'] ?? ''),
+                'size' => (int) ($file['size'] ?? 0),
+                'error' => (int) ($file['error'] ?? UPLOAD_ERR_NO_FILE),
+                'type' => (string) ($file['type'] ?? ''),
+            ];
+        }
+
+        return $files;
     }
 }

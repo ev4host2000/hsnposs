@@ -99,6 +99,130 @@ final class AuthRepository extends Repository
         return is_array($row) ? $row : null;
     }
 
+    public function findDeviceByInstallation(string $companyId, string $installationId): ?array
+    {
+        $stmt = $this->db->pdo()->prepare(
+            'SELECT id, company_id, installation_id, status, revoked_at
+             FROM devices
+             WHERE company_id = :company_id AND installation_id = :installation_id
+             LIMIT 1',
+        );
+        $stmt->execute([
+            'company_id' => $companyId,
+            'installation_id' => $installationId,
+        ]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        return is_array($row) ? $row : null;
+    }
+
+    /** @return array<string, mixed>|null */
+    public function findDeviceByInstallationGlobal(string $installationId): ?array
+    {
+        if ($installationId === '') {
+            return null;
+        }
+
+        $stmt = $this->db->pdo()->prepare(
+            'SELECT id, company_id, installation_id, status, revoked_at
+             FROM devices
+             WHERE installation_id = :installation_id
+             ORDER BY last_seen_at DESC NULLS LAST
+             LIMIT 1',
+        );
+        $stmt->execute(['installation_id' => $installationId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        return is_array($row) ? $row : null;
+    }
+
+    /** @return list<array<string, mixed>> */
+    public function findLoginAccountsByEmail(string $email): array
+    {
+        $stmt = $this->db->pdo()->prepare(
+            'SELECT
+                u.id::text AS user_id,
+                u.company_id::text AS company_id,
+                u.default_branch_id::text AS branch_id,
+                u.email::text AS email,
+                u.password_hash,
+                u.account_status,
+                c.name AS company_name,
+                c.status AS company_status
+             FROM users u
+             INNER JOIN companies c ON c.id = u.company_id
+             WHERE lower(u.email::text) = lower(:email)
+               AND u.deleted_at IS NULL
+               AND u.role IN (\'owner\', \'admin\', \'manager\', \'cashier\')
+             ORDER BY c.name ASC',
+        );
+        $stmt->execute(['email' => trim($email)]);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        return is_array($rows) ? $rows : [];
+    }
+
+    /**
+     * Owners matching forgot-password update criteria (email + active owner).
+     *
+     * @return list<array{id: string, company_id: string}>
+     */
+    public function findActiveOwnersByEmail(string $email): array
+    {
+        $stmt = $this->db->pdo()->prepare(
+            'SELECT id::text AS id, company_id::text AS company_id
+             FROM users
+             WHERE lower(email::text) = lower(:email)
+               AND deleted_at IS NULL
+               AND role = \'owner\'
+               AND account_status = \'active\'',
+        );
+        $stmt->execute(['email' => trim($email)]);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        return is_array($rows) ? $rows : [];
+    }
+
+    /**
+     * Owners matching Ops reset-password update criteria (company + owner).
+     *
+     * @return list<array{id: string, company_id: string}>
+     */
+    public function findOwnersByCompany(string $companyId): array
+    {
+        $stmt = $this->db->pdo()->prepare(
+            'SELECT id::text AS id, company_id::text AS company_id
+             FROM users
+             WHERE company_id = :company_id
+               AND deleted_at IS NULL
+               AND role = \'owner\'',
+        );
+        $stmt->execute(['company_id' => $companyId]);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        return is_array($rows) ? $rows : [];
+    }
+
+    public function updateOwnerPasswordsByEmail(string $email, string $passwordHash): int
+    {
+        $stmt = $this->db->pdo()->prepare(
+            'UPDATE users
+             SET password_hash = :password_hash,
+                 updated_at = now(),
+                 row_version = row_version + 1
+             WHERE lower(email::text) = lower(:email)
+               AND deleted_at IS NULL
+               AND role = \'owner\'
+               AND account_status = \'active\'',
+        );
+        $stmt->execute([
+            'email' => trim($email),
+            'password_hash' => $passwordHash,
+        ]);
+
+        return $stmt->rowCount();
+    }
+
     public function touchDeviceLastSeen(string $deviceId): void
     {
         $stmt = $this->db->pdo()->prepare(
@@ -168,7 +292,7 @@ final class AuthRepository extends Repository
         string $tokenHash,
         string $userId,
         string $companyId,
-        string $sessionId,
+        ?string $sessionId,
         array $scopes,
         \DateTimeImmutable $expiresAt,
     ): string {
@@ -269,6 +393,59 @@ final class AuthRepository extends Repository
         return is_array($row) ? $row : null;
     }
 
+    /** @param list<string> $scopes */
+    public function createPlatformAdminToken(
+        string $tokenId,
+        string $tokenHash,
+        array $scopes,
+        \DateTimeImmutable $expiresAt,
+    ): void {
+        $stmt = $this->db->pdo()->prepare(
+            'INSERT INTO platform_admin_tokens (
+                id, token_hash, scopes, issued_at, expires_at
+             ) VALUES (
+                :id, :token_hash, :scopes, now(), :expires_at
+             )',
+        );
+        $stmt->execute([
+            'id' => $tokenId,
+            'token_hash' => $tokenHash,
+            'scopes' => $this->toPgArray($scopes),
+            'expires_at' => $expiresAt->format('Y-m-d H:i:sP'),
+        ]);
+    }
+
+    public function findPlatformAdminTokenByHash(string $tokenHash): ?array
+    {
+        $stmt = $this->db->pdo()->prepare(
+            'SELECT * FROM platform_admin_tokens WHERE token_hash = :token_hash LIMIT 1',
+        );
+        $stmt->execute(['token_hash' => $tokenHash]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        return is_array($row) ? $row : null;
+    }
+
+    public function revokePlatformAdminTokenByHash(string $tokenHash): void
+    {
+        $stmt = $this->db->pdo()->prepare(
+            'UPDATE platform_admin_tokens
+             SET revoked_at = now()
+             WHERE token_hash = :token_hash AND revoked_at IS NULL',
+        );
+        $stmt->execute(['token_hash' => $tokenHash]);
+    }
+
+    public function revokeAllActivePlatformAdminTokens(): void
+    {
+        $stmt = $this->db->pdo()->prepare(
+            'UPDATE platform_admin_tokens
+             SET revoked_at = now()
+             WHERE revoked_at IS NULL',
+        );
+        $stmt->execute();
+    }
+
     public function revokeApiTokensForSession(string $sessionId): void
     {
         $stmt = $this->db->pdo()->prepare(
@@ -310,6 +487,33 @@ final class AuthRepository extends Repository
             $this->revokeApiTokensForSession((string) $sessionId);
             $this->revokeRefreshTokensForSession((string) $sessionId);
         }
+    }
+
+    /**
+     * RAP-P0-05: pairing / orphan access tokens (no device_session_id) for one user in a company.
+     * Narrower than company-wide revoke (P0-02).
+     */
+    public function revokeOrphanApiTokensForUser(string $userId, string $companyId): void
+    {
+        $stmt = $this->db->pdo()->prepare(
+            'UPDATE api_tokens SET revoked_at = now()
+             WHERE subject_type = \'user\'
+               AND subject_id = :user_id
+               AND company_id = :company_id
+               AND device_session_id IS NULL
+               AND revoked_at IS NULL',
+        );
+        $stmt->execute([
+            'user_id' => $userId,
+            'company_id' => $companyId,
+        ]);
+    }
+
+    /** RAP-P0-05: full credential-session kill for one user after password change. */
+    public function revokeUserAccessAfterPasswordChange(string $userId, string $companyId): void
+    {
+        $this->revokeAllUserSessions($userId, $companyId);
+        $this->revokeOrphanApiTokensForUser($userId, $companyId);
     }
 
     public function updateUserLastLogin(string $userId): void

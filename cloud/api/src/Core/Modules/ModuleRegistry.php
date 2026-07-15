@@ -7,6 +7,9 @@ namespace MizaCloud\Core\Modules;
 use MizaCloud\Core\Container\Container;
 use MizaCloud\Core\Router\Router;
 use MizaCloud\Modules\Auth\AuthModule;
+use MizaCloud\Modules\Admin\AdminModule;
+use MizaCloud\Modules\Owner\OwnerModule;
+use MizaCloud\Modules\PublicApi\PublicApiModule;
 use MizaCloud\Modules\Branches\BranchesModule;
 use MizaCloud\Modules\Catalog\CatalogModule;
 use MizaCloud\Modules\Companies\CompaniesModule;
@@ -14,6 +17,7 @@ use MizaCloud\Modules\Conflicts\ConflictsModule;
 use MizaCloud\Modules\Devices\DevicesModule;
 use MizaCloud\Modules\Health\HealthModule;
 use MizaCloud\Modules\Invoices\InvoicesModule;
+use MizaCloud\Modules\Media\MediaModule;
 use MizaCloud\Modules\Notifications\NotificationsModule;
 use MizaCloud\Modules\Sync\SyncModule;
 use MizaCloud\Modules\Users\UsersModule;
@@ -28,12 +32,16 @@ final class ModuleRegistry
         $modules = [
             new HealthModule(),
             new AuthModule(),
+            new AdminModule(),
+            new PublicApiModule(),
+            new OwnerModule(),
             new DevicesModule(),
             new CompaniesModule(),
             new BranchesModule(),
             new UsersModule(),
             new CatalogModule(),
             new InvoicesModule(),
+            new MediaModule(),
             new SyncModule(),
             new ConflictsModule(),
             new NotificationsModule(),

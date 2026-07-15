@@ -21,6 +21,13 @@ class OpeningStockInventoryPostingStage extends PostingStage {
       );
     }
 
+    if (context.stageData['idempotent_replay'] == true) {
+      context.stageData['inventory_posted'] = true;
+      context.stageData['inventory_movements'] =
+          OpeningStockPostEffects.inventoryJson(inventory);
+      return const PostingStageResult.proceed();
+    }
+
     final header = context.aggregate.header;
     try {
       await OpeningStockPostDb.applyInventoryEffect(

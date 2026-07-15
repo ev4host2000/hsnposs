@@ -35,7 +35,38 @@ trait InventoryAdjustmentPostLww
 
         $existing = $this->fetchInventoryAdjustmentRow($companyId, $entityId);
         if ($existing === null || ($existing['deleted_at'] ?? null) !== null) {
-            throw new HttpException('not_found', 'Draft adjustment not found', 404);
+            // الترحيل وصل قبل create — أنشئ المسودة من حمولة post ثم أكمل.
+            $headerTxnForDraft = max(0, (int) ($header['transaction_version'] ?? 0));
+            $draftHeader = $header;
+            $draftHeader['status'] = 'draft';
+            $draftHeader['transaction_version'] = max(0, $headerTxnForDraft - 1);
+            $draftHeader['row_version'] = max(
+                1,
+                (int) ($header['row_version'] ?? $clientRowVersion) - 1,
+            );
+            try {
+                $this->applyDraftLww(
+                    $companyId,
+                    $branchId,
+                    $entityId,
+                    'create',
+                    [
+                        'aggregate' => [
+                            'header' => $draftHeader,
+                            'lines' => $lines,
+                            'metadata' => [],
+                        ],
+                    ],
+                    max(1, $clientRowVersion - 1),
+                    $originDeviceId,
+                );
+            } catch (HttpException $e) {
+                throw $e;
+            }
+            $existing = $this->fetchInventoryAdjustmentRow($companyId, $entityId);
+            if ($existing === null || ($existing['deleted_at'] ?? null) !== null) {
+                throw new HttpException('not_found', 'Draft adjustment not found', 404);
+            }
         }
 
         $dbStatus = (string) ($existing['adjustment_status'] ?? '');
@@ -260,7 +291,17 @@ trait InventoryAdjustmentPostLww
         }
 
         $current = (float) ($stockRow['stock_qty'] ?? 0);
-        $newStock = $current + $quantity;
+        $qty = abs($quantity);
+        $type = strtolower(trim($movementType));
+        if ($type === 'out') {
+            $newStock = $current - $qty;
+            if ($newStock < -1e-9) {
+                throw new HttpException('insufficient_stock', 'Insufficient stock for adjustment post', 409);
+            }
+        } else {
+            $newStock = $current + $qty;
+        }
+
 
         $insert = $pdo->prepare(
             'INSERT INTO stock_movements (

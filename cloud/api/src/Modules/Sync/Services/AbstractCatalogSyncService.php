@@ -7,8 +7,11 @@ namespace MizaCloud\Modules\Sync\Services;
 use MizaCloud\Core\Exceptions\HttpException;
 use MizaCloud\Core\Http\Request;
 use MizaCloud\Core\Logging\Logger;
+use MizaCloud\Modules\Admin\Services\OpsAuditWriter;
+use MizaCloud\Modules\Admin\Support\OpsAuditActions;
 use MizaCloud\Modules\Devices\Support\BearerToken;
 use MizaCloud\Modules\Sync\Repositories\SyncRepositorySupport;
+use MizaCloud\Modules\Sync\Support\SyncPushBatchExecutor;
 use MizaCloud\Modules\Sync\Validators\SyncValidator;
 use Throwable;
 
@@ -23,6 +26,7 @@ abstract class AbstractCatalogSyncService
 
     /**
      * @param array<string, mixed> $payload
+     * @param array<string, mixed>|null $preAuthenticatedClaims
      * @return array{data: array<string, mixed>, status: int}
      */
     protected function pushEntities(
@@ -32,8 +36,9 @@ abstract class AbstractCatalogSyncService
         string $entityScope,
         string $entityType,
         callable $applyLww,
+        ?array $preAuthenticatedClaims = null,
     ): array {
-        $claims = $this->bearer->authenticate($request, ['sync:push']);
+        $claims = $preAuthenticatedClaims ?? $this->bearer->authenticate($request, ['sync:push']);
         $this->assertDeviceContext($request, $claims, $payload);
 
         if ($validator->failed()) {
@@ -50,108 +55,153 @@ abstract class AbstractCatalogSyncService
         $events = $payload['events'];
 
         if (($claims['company_id'] ?? '') !== $companyId) {
+            OpsAuditWriter::recordAction(OpsAuditActions::ORG_MISMATCH, 'failure', [
+                'organization_id' => $companyId,
+                'device_id' => $deviceId,
+                'entity' => $entityType,
+                'error_code' => 'organization_mismatch',
+                'reason' => 'company_id claim mismatch on push',
+            ], $request);
             throw new HttpException('forbidden', 'Company mismatch', 403);
         }
 
-        $repo = $this->repository();
-        $accepted = 0;
-        $duplicates = 0;
-        $sequences = [];
+        $started = microtime(true);
+        OpsAuditWriter::recordAction(OpsAuditActions::PUSH_STARTED, 'success', [
+            'organization_id' => $companyId,
+            'branch_id' => $branchId,
+            'device_id' => $deviceId,
+            'entity' => $entityType,
+            'transaction_uuid' => $batchId,
+            'metadata' => ['event_count' => count($events)],
+        ], $request);
 
+        $repo = $this->repository();
         $repo->beginTransaction();
         try {
-            foreach ($events as $event) {
-                $idempotencyKey = (string) $event['idempotency_key'];
-                if ($repo->findQueueByIdempotency($deviceId, $idempotencyKey) !== null) {
-                    $duplicates++;
-                    continue;
-                }
-
-                $entityId = (string) $event['entity_id'];
-                $operation = (string) $event['operation'];
-                $clientRowVersion = (int) ($event['client_row_version'] ?? 1);
-                $payloadJson = is_array($event['payload_json'] ?? null)
-                    ? $event['payload_json']
-                    : [];
-                $occurredAt = isset($event['occurred_at']) ? (string) $event['occurred_at'] : null;
-
-                $applied = $applyLww(
-                    $companyId,
-                    $branchId,
-                    $entityId,
-                    $operation,
-                    $payloadJson,
-                    $clientRowVersion,
-                    $deviceId,
-                );
-
-                $sequence = $repo->nextSyncSequence($companyId);
-                $changelogPayload = $operation === 'delete'
-                    ? ['id' => $entityId, 'deleted' => true, 'row_version' => $applied['row_version']]
-                    : $applied;
-
-                $repo->insertChangelog(
-                    $companyId,
-                    $branchId,
-                    $sequence,
-                    $entityType,
-                    $entityId,
-                    $operation,
-                    $changelogPayload,
-                    (int) $applied['row_version'],
-                    $deviceId,
-                    $occurredAt,
-                );
-
-                $repo->insertSyncQueue(
+            $outcome = SyncPushBatchExecutor::run(
+                $repo->database(),
+                $events,
+                function (array $event) use (
+                    $repo,
                     $companyId,
                     $branchId,
                     $deviceId,
                     $batchId,
                     $entityType,
-                    $entityId,
-                    $operation,
-                    $changelogPayload,
-                    $clientRowVersion,
-                    $idempotencyKey,
-                );
+                    $applyLww,
+                ): array {
+                    $idempotencyKey = (string) $event['idempotency_key'];
+                    if ($repo->findQueueByIdempotency($deviceId, $idempotencyKey) !== null) {
+                        return ['kind' => 'duplicate'];
+                    }
 
-                $accepted++;
-                $sequences[] = $sequence;
-            }
+                    $entityId = (string) $event['entity_id'];
+                    $operation = (string) $event['operation'];
+                    $clientRowVersion = (int) ($event['client_row_version'] ?? 1);
+                    $payloadJson = is_array($event['payload_json'] ?? null)
+                        ? $event['payload_json']
+                        : [];
+                    $occurredAt = isset($event['occurred_at']) ? (string) $event['occurred_at'] : null;
 
-            if ($accepted > 0) {
+                    $applied = $applyLww(
+                        $companyId,
+                        $branchId,
+                        $entityId,
+                        $operation,
+                        $payloadJson,
+                        $clientRowVersion,
+                        $deviceId,
+                        $event,
+                    );
+
+                    // Safe Equality no-op: accept without mutating changelog / queue / sequence.
+                    if (($applied['no_op'] ?? false) === true) {
+                        return ['kind' => 'accepted'];
+                    }
+
+                    $sequence = $repo->nextSyncSequence($companyId);
+                    $changelogPayload = $operation === 'delete'
+                        ? ['id' => $entityId, 'deleted' => true, 'row_version' => $applied['row_version']]
+                        : $applied;
+
+                    $repo->insertChangelog(
+                        $companyId,
+                        $branchId,
+                        $sequence,
+                        $entityType,
+                        $entityId,
+                        $operation,
+                        $changelogPayload,
+                        (int) $applied['row_version'],
+                        $deviceId,
+                        $occurredAt,
+                    );
+
+                    $repo->insertSyncQueue(
+                        $companyId,
+                        $branchId,
+                        $deviceId,
+                        $batchId,
+                        $entityType,
+                        $entityId,
+                        $operation,
+                        $changelogPayload,
+                        $clientRowVersion,
+                        $idempotencyKey,
+                    );
+
+                    return ['kind' => 'accepted', 'sequence' => $sequence];
+                },
+            );
+
+            if ($outcome['accepted'] > 0) {
                 $repo->bumpCloudVersion($companyId, $branchId, $entityScope);
             }
 
             $repo->commit();
         } catch (Throwable $e) {
             $repo->rollBack();
+            OpsAuditWriter::recordAction(OpsAuditActions::SYNC_FAILED, 'failure', [
+                'organization_id' => $companyId,
+                'branch_id' => $branchId,
+                'device_id' => $deviceId,
+                'entity' => $entityType,
+                'transaction_uuid' => $batchId,
+                'error_code' => 'sync_push_failed',
+                'error_message' => $e->getMessage(),
+                'duration' => round((microtime(true) - $started) * 1000, 2),
+            ], $request);
             throw $e;
         }
-
-        $statusLabel = $accepted === 0 && $duplicates > 0 ? 'duplicate' : 'accepted';
-        $httpStatus = $statusLabel === 'duplicate' ? 200 : 202;
 
         $this->logger->info("sync.push.{$entityScope}", [
             'batch_id' => $batchId,
             'device_id' => $deviceId,
-            'accepted' => $accepted,
-            'duplicates' => $duplicates,
+            'accepted' => $outcome['accepted'],
+            'duplicates' => $outcome['duplicates'],
+            'rejected' => count($outcome['rejected_events']),
         ]);
 
-        return [
-            'status' => $httpStatus,
-            'data' => [
-                'batch_id' => $batchId,
-                'status' => $statusLabel,
-                'accepted' => $accepted,
-                'duplicates' => $duplicates,
-                'rejected' => 0,
-                'queued_at' => gmdate('Y-m-d\TH:i:s.v\Z'),
-                'changelog_sequences' => $sequences,
+        $rejected = count($outcome['rejected_events']);
+        $status = $rejected > 0 && $outcome['accepted'] > 0 ? 'partial' : ($rejected > 0 ? 'failure' : 'success');
+        $action = $status === 'partial'
+            ? OpsAuditActions::PARTIAL_SYNC
+            : ($status === 'failure' ? OpsAuditActions::SYNC_FAILED : OpsAuditActions::PUSH_FINISHED);
+        OpsAuditWriter::recordAction($action, $status === 'failure' ? 'failure' : 'success', [
+            'organization_id' => $companyId,
+            'branch_id' => $branchId,
+            'device_id' => $deviceId,
+            'entity' => $entityType,
+            'transaction_uuid' => $batchId,
+            'duration' => round((microtime(true) - $started) * 1000, 2),
+            'metadata' => [
+                'accepted' => $outcome['accepted'],
+                'duplicates' => $outcome['duplicates'],
+                'rejected' => $rejected,
             ],
-        ];
+        ], $request);
+
+        return SyncPushBatchExecutor::finalizeOrThrowPartial($batchId, $outcome);
     }
 
     /**
@@ -180,8 +230,21 @@ abstract class AbstractCatalogSyncService
         $limit = min(max((int) ($query['limit'] ?? 100), 1), 500);
 
         if (($claims['company_id'] ?? '') !== $companyId) {
+            OpsAuditWriter::recordAction(OpsAuditActions::ORG_MISMATCH, 'failure', [
+                'organization_id' => $companyId,
+                'entity' => $entityType,
+                'error_code' => 'organization_mismatch',
+                'reason' => 'company_id claim mismatch on pull',
+            ], $request);
             throw new HttpException('forbidden', 'Company mismatch', 403);
         }
+
+        $started = microtime(true);
+        OpsAuditWriter::recordAction(OpsAuditActions::PULL_STARTED, 'success', [
+            'organization_id' => $companyId,
+            'branch_id' => $branchId,
+            'entity' => $entityType,
+        ], $request);
 
         $rows = $fetchChangelog($entityType, $companyId, $branchId, $sinceSequence, $limit + 1);
 
@@ -215,6 +278,14 @@ abstract class AbstractCatalogSyncService
             ];
         }
 
+        OpsAuditWriter::recordAction(OpsAuditActions::PULL_FINISHED, 'success', [
+            'organization_id' => $companyId,
+            'branch_id' => $branchId,
+            'entity' => $entityType,
+            'duration' => round((microtime(true) - $started) * 1000, 2),
+            'metadata' => ['entry_count' => count($entries), 'has_more' => $hasMore],
+        ], $request);
+
         return [
             'data' => [
                 'company_id' => $companyId,
@@ -242,19 +313,35 @@ abstract class AbstractCatalogSyncService
         $bodyDeviceId = (string) ($payload['device_id'] ?? '');
 
         if ($headerDeviceId !== '' && $claimDeviceId !== '' && $headerDeviceId !== $claimDeviceId) {
+            OpsAuditWriter::recordAction(OpsAuditActions::FORBIDDEN, 'failure', [
+                'device_id' => $claimDeviceId,
+                'error_code' => 'device_header_mismatch',
+            ], $request);
             throw new HttpException('forbidden', 'Device header mismatch', 403);
         }
         if ($bodyDeviceId !== '' && $claimDeviceId !== '' && $bodyDeviceId !== $claimDeviceId) {
+            OpsAuditWriter::recordAction(OpsAuditActions::FORBIDDEN, 'failure', [
+                'device_id' => $claimDeviceId,
+                'error_code' => 'device_body_mismatch',
+            ], $request);
             throw new HttpException('forbidden', 'Device body mismatch', 403);
         }
 
         $headerCompany = $request->headers['X-Company-ID'] ?? $request->headers['x-company-id'] ?? '';
         if ($headerCompany !== '' && $headerCompany !== (string) ($payload['company_id'] ?? '')) {
+            OpsAuditWriter::recordAction(OpsAuditActions::ORG_MISMATCH, 'failure', [
+                'organization_id' => (string) ($payload['company_id'] ?? ''),
+                'error_code' => 'company_header_mismatch',
+            ], $request);
             throw new HttpException('forbidden', 'Company header mismatch', 403);
         }
 
         $headerBranch = $request->headers['X-Branch-ID'] ?? $request->headers['x-branch-id'] ?? '';
         if ($headerBranch !== '' && $headerBranch !== (string) ($payload['branch_id'] ?? '')) {
+            OpsAuditWriter::recordAction(OpsAuditActions::FORBIDDEN, 'failure', [
+                'branch_id' => (string) ($payload['branch_id'] ?? ''),
+                'error_code' => 'branch_header_mismatch',
+            ], $request);
             throw new HttpException('forbidden', 'Branch header mismatch', 403);
         }
     }
