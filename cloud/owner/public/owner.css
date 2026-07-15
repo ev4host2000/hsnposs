@@ -1,0 +1,40 @@
+:root {
+  --bg: #0f1419;
+  --surface: #1a2332;
+  --surface-2: #243044;
+  --text: #e8edf5;
+  --muted: #9aa8bc;
+  --primary: #3b82f6;
+  --primary-hover: #2563eb;
+  --border: #2d3a4f;
+  --radius: 10px;
+  font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); min-height: 100vh; }
+.hidden { display: none !important; }
+.muted { color: var(--muted); font-size: 0.9rem; }
+.error { color: #fca5a5; margin-top: 0.5rem; }
+.success { color: #86efac; margin-top: 0.5rem; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; margin-bottom: 1rem; }
+.login-card { width: min(420px, 92vw); margin: 12vh auto; }
+.panel { min-height: 100vh; padding: 1rem; }
+label { display: block; margin-bottom: 1rem; font-size: 0.9rem; }
+input, select, textarea { width: 100%; margin-top: 0.35rem; padding: 0.65rem 0.75rem; border-radius: 8px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text); font-family: inherit; }
+.btn { border: none; border-radius: 8px; padding: 0.55rem 1rem; cursor: pointer; }
+.btn.primary { background: var(--primary); color: #fff; }
+.btn.ghost { background: transparent; color: var(--text); border: 1px solid var(--border); }
+.topbar { display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.5rem; border-bottom: 1px solid var(--border); background: var(--surface); }
+.content { padding: 1.25rem 1.5rem; max-width: 960px; margin: 0 auto; }
+.stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.75rem; margin-bottom: 1rem; }
+.stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem; }
+.stat-card strong { display: block; font-size: 1.35rem; margin-bottom: 0.25rem; }
+.table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); }
+table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+th, td { padding: 0.75rem; border-bottom: 1px solid var(--border); text-align: right; }
+th { background: var(--surface); color: var(--muted); }
+.badge { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 999px; font-size: 0.8rem; }
+.badge.active { background: #14532d; color: #bbf7d0; }
+.badge.revoked { background: #450a0a; color: #fecaca; }
+.toast { position: fixed; bottom: 1.25rem; left: 50%; transform: translateX(-50%); background: var(--surface-2); border: 1px solid var(--border); padding: 0.75rem 1rem; border-radius: 8px; z-index: 100; }
+a { color: #93c5fd; }

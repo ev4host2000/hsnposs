@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Miza Cloud — لوحة المالك</title>
+  <link rel="stylesheet" href="owner.css">
+</head>
+<body>
+  <div id="login-view" class="panel">
+    <div class="card login-card">
+      <h1>لوحة المالك</h1>
+      <p class="muted">متابعة متجرك على Miza Cloud</p>
+      <form id="login-form">
+        <label>البريد<input type="email" id="email" required></label>
+        <label>كلمة المرور<input type="password" id="password" required></label>
+        <div id="company-select-wrap" class="hidden">
+          <label>المتجر<select id="company-select"></select></label>
+        </div>
+        <button type="submit" class="btn primary">دخول</button>
+        <p id="login-error" class="error hidden"></p>
+      </form>
+    </div>
+  </div>
+
+  <section id="main-view" class="hidden">
+    <header class="topbar">
+      <div><strong id="company-name"></strong> <span class="muted" id="user-name"></span></div>
+      <button id="logout-btn" class="btn ghost" type="button">خروج</button>
+    </header>
+    <main class="content">
+      <div id="summary-cards" class="stat-grid"></div>
+      <div class="card" id="subscription-card"></div>
+      <h3>الأجهزة المتصلة</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>الجهاز</th><th>المنصة</th><th>الإصدار</th><th>آخر ظهور</th><th>الحالة</th></tr></thead>
+          <tbody id="devices-tbody"></tbody>
+        </table>
+      </div>
+    </main>
+  </section>
+  <div id="toast" class="toast hidden"></div>
+  <script src="owner.js"></script>
+</body>
+</html>
