@@ -1,7 +1,10 @@
 ﻿# GA Release Stamp
 version: 1.0.41+42
-git_commit: 262a392b3ba4c6bfc9a6de3998cfb3c42a2b37aa
-git_commit_short: 262a392
+git_commit: f2b0b7bfe28cefd7f0d0021310bb0817f3fc19c5
+git_commit_short: f2b0b7b
 channel: production
 built_for: Desktop + Android + Backend
-notes: Monitoring + Ops Audit + Desktop parity + Admin module hygiene
+desktop_setup: dist/MizaPos-Setup-1.0.41.exe
+desktop_sha256: A6AA525D2E0595FD126CE568983A93A5B3782AB9A1D34B731FED52A282595F22
+previous_production_commit: fb09a44a675b92c1ebd559f7a256175c1dceea7a
+notes: Monitoring + Ops Audit + Desktop parity + Admin/PublicApi/Owner/Media hygiene
